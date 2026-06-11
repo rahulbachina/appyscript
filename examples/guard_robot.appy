@@ -1,0 +1,17 @@
+# Guard Robot — barks when someone gets too close
+# Works on: ESP32, Arduino, micro:bit, Pico
+
+when distance < 30cm
+  say "INTRUDER ALERT!"
+  show angry
+  spin right 180°
+  wait 1s
+  show alert
+end
+
+forever
+  if distance > 60cm
+    show happy
+  end
+  wait 500ms
+end

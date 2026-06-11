@@ -1,0 +1,31 @@
+{
+  "name": "appyscript",
+  "version": "0.1.0",
+  "description": "AppyScript — the first English-first programming language for educational robotics. Compiles to MicroPython and Arduino C++.",
+  "author": "Applaa <rahul.bachin@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/rahulbachina/appyscript",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rahulbachina/appyscript.git"
+  },
+  "keywords": ["robotics", "education", "appyscript", "esp32", "arduino", "micropython", "kids", "language", "compiler"],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "appyscript": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test dist/test/",
+    "mcp": "node dist/mcp/server.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

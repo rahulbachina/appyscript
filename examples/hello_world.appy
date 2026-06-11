@@ -1,0 +1,9 @@
+# Hello World — the simplest AppyScript program
+# Works on: ESP32, Arduino, micro:bit, Pico
+
+when start
+  show happy
+  say "Hello! I am Appy!"
+  wait 1s
+  show calm
+end

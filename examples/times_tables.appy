@@ -1,0 +1,30 @@
+# Times Table Teacher — quizzes the student on 5 times table
+# Works on: ESP32, micro:bit, Pico (needs display)
+
+let score = 0
+
+when start
+  show excited
+  say "Let's do the 5 times table!"
+  wait 1s
+
+  repeat 5 times
+    say "What is 5 times?"
+    show thinking
+    wait 3s
+    change score by 1
+  end
+
+  say "Great job!"
+  show happy
+end
+
+when button_a pressed
+  show happy
+  say "Correct!"
+end
+
+when button_b pressed
+  show sad
+  say "Try again!"
+end

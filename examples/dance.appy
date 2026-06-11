@@ -1,0 +1,30 @@
+# Dance Robot — performs a routine when shaken
+# Works on: ESP32, Arduino, micro:bit, Pico
+
+define spin_dance
+  spin right 180°
+  wait 200ms
+  spin left 180°
+  wait 200ms
+end
+
+define wave
+  move left at 50% for 300ms
+  move right at 50% for 300ms
+  stop
+end
+
+when shaken
+  show excited
+  say "Let's dance!"
+  repeat 3 times
+    do spin_dance
+  end
+  do wave
+  show happy
+end
+
+when button_a pressed
+  show calm
+  stop
+end
