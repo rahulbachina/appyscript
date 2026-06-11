@@ -1,0 +1,1 @@
+{"version":3,"file":"microbit.d.ts","sourceRoot":"","sources":["../../src/backends/microbit.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,OAAO,EAAyC,MAAM,QAAQ,CAAA;AAE5E,OAAO,KAAK,EAAE,eAAe,EAAE,cAAc,EAAE,MAAM,YAAY,CAAA;AAyKjE,eAAO,MAAM,eAAe;;;;sBAIR,OAAO,WAAW,eAAe,GAAG,cAAc;CAGrE,CAAA;AAED,kBAAkB;AAClB,wBAAgB,gBAAgB,CAAC,OAAO,EAAE,OAAO,GAAG,MAAM,CAMzD"}

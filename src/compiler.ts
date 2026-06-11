@@ -1,59 +1,67 @@
-// AppyScript Compiler — main entry point
-// compile(source, target) → { code, errors }
+// AppyScript Compiler — v2
+// Full pipeline: tokenize → parse → semantic analyse → lint → codegen
+// Returns rich diagnostics, source maps, and (on success) generated code.
 
 import { tokenize, LexError } from './lexer'
 import { parse, ParseError } from './parser'
-import { generateESP32 } from './backends/esp32'
-import { generateArduino } from './backends/arduino'
-import { generateMicrobit } from './backends/microbit'
+import { SemanticAnalyser } from './analysis/semantic'
+import { Linter } from './analysis/linter'
+import { DiagnosticBag, Diagnostic, CODES, DiagnosticSeverity, formatDiagnostics } from './diagnostics'
+import { registry, HARDWARE_PROFILES, HardwareProfile } from './plugins'
+import { esp32Backend }   from './backends/esp32'
+import { arduinoBackend } from './backends/arduino'
+import { microbitBackend } from './backends/microbit'
+import { picoBackend }    from './backends/pico'
+import type { SourceMap } from './sourcemap'
+import type { Program } from './ast'
 
-export type Target = 'esp32' | 'arduino' | 'pico' | 'microbit'
+// Register built-in backends
+registry.register(esp32Backend)
+registry.register(arduinoBackend)
+registry.register(microbitBackend)
+registry.register(picoBackend)
+
+export type Target = 'esp32' | 'arduino' | 'pico' | 'microbit' | string
+
+export interface CompileOptions {
+  /** Skip semantic analysis (faster, for trusted code) */
+  skipSemantic?: boolean
+  /** Skip linting (no warnings) */
+  skipLint?: boolean
+  /** Include source map in output */
+  sourceMap?: boolean
+  /** Treat lint warnings as errors */
+  strict?: boolean
+}
 
 export interface CompileResult {
   ok: boolean
   code?: string
-  errors?: CompileError[]
-}
-
-export interface CompileError {
-  message: string
-  line?: number
-  col?: number
+  sourceMap?: SourceMap
+  diagnostics: Diagnostic[]
+  /** Convenience: only error-severity diagnostics */
+  errors: Diagnostic[]
+  /** Convenience: only warning-severity diagnostics */
+  warnings: Diagnostic[]
+  /** Human-readable formatted diagnostic output */
+  formattedDiagnostics?: string
+  /** The parsed AST, if parsing succeeded (useful for tooling) */
+  ast?: Program
 }
 
 export interface TargetInfo {
-  id: Target
+  id: string
   name: string
   runtime: string
   description: string
 }
 
-export const TARGETS: TargetInfo[] = [
-  {
-    id: 'esp32',
-    name: 'ESP32 / M5Stack',
-    runtime: 'MicroPython',
-    description: 'M5Stack Core S3 SE, ESP32-S3 dev boards. WiFi + display + speaker built in.',
-  },
-  {
-    id: 'arduino',
-    name: 'Arduino',
-    runtime: 'C++',
-    description: 'Arduino Uno, Nano, Mega. Most common beginner robotics boards globally.',
-  },
-  {
-    id: 'pico',
-    name: 'Raspberry Pi Pico W',
-    runtime: 'MicroPython',
-    description: 'RP2040 dual-core. WiFi. £4 chip. Popular in UK schools.',
-  },
-  {
-    id: 'microbit',
-    name: 'BBC micro:bit V2',
-    runtime: 'MicroPython',
-    description: '5×5 LED matrix, 2 buttons, accelerometer. Used by 5M+ UK students.',
-  },
-]
+export const TARGETS: TargetInfo[] = Object.values(HARDWARE_PROFILES).map(p => ({
+  id: p.id,
+  name: p.name,
+  runtime: p.runtime,
+  description: p.description,
+}))
 
 export const KEYWORDS = [
   'when', 'on', 'forever', 'define', 'do',
@@ -68,44 +76,87 @@ export const KEYWORDS = [
   'yes', 'no', 'true', 'false',
 ]
 
-export function compile(source: string, target: Target): CompileResult {
+// ── Main compile function ─────────────────────────────────────────────────────
+
+export function compile(source: string, target: Target, options: CompileOptions = {}): CompileResult {
+  const bag = new DiagnosticBag()
+
+  // Step 1: Lex
+  let tokens
   try {
-    const tokens = tokenize(source)
-    const ast = parse(tokens)
-
-    let code: string
-    switch (target) {
-      case 'esp32': code = generateESP32(ast); break
-      case 'arduino': code = generateArduino(ast); break
-      case 'microbit': code = generateMicrobit(ast); break
-      case 'pico':
-        // Pico uses the same MicroPython structure as ESP32 with different prelude imports
-        code = generateESP32(ast).replace(
-          /from applaa_robot import Robot, wait_ms/,
-          'from applaa_robot_pico import Robot, wait_ms'
-        )
-        break
-    }
-
-    return { ok: true, code }
+    tokens = tokenize(source)
   } catch (err) {
-    if (err instanceof LexError || err instanceof ParseError) {
-      return {
-        ok: false,
-        errors: [{ message: err.message, line: err.line, col: err.col }],
-      }
+    if (err instanceof LexError) {
+      bag.error(CODES.LEX_UNEXPECTED_CHAR, err.message, { line: err.line, col: err.col })
+    } else {
+      bag.error('E000', String(err))
     }
-    return {
-      ok: false,
-      errors: [{ message: String(err) }],
-    }
+    return makeResult(false, bag, source)
   }
+
+  // Step 2: Parse
+  let ast: Program
+  try {
+    ast = parse(tokens)
+    ast.source = source
+  } catch (err) {
+    if (err instanceof ParseError) {
+      bag.error(CODES.PARSE_UNEXPECTED_TOKEN, err.message, { line: err.line, col: err.col })
+    } else {
+      bag.error('E000', String(err))
+    }
+    return makeResult(false, bag, source)
+  }
+
+  // Step 3: Semantic analysis
+  if (!options.skipSemantic) {
+    const hardware = HARDWARE_PROFILES[target]
+    const semBag = new SemanticAnalyser().analyse(ast, hardware)
+    bag.merge(semBag)
+    if (bag.hasErrors) return makeResult(false, bag, source, ast)
+  }
+
+  // Step 4: Linting
+  if (!options.skipLint) {
+    const lintBag = new Linter().lint(ast)
+    bag.merge(lintBag)
+    if (options.strict && bag.hasErrors) return makeResult(false, bag, source, ast)
+  }
+
+  // Step 5: Code generation
+  const backend = registry.get(target)
+  if (!backend) {
+    bag.error('E030', `Unknown target "${target}". Run appyscript list-targets to see options.`)
+    return makeResult(false, bag, source, ast)
+  }
+
+  const profile = HARDWARE_PROFILES[target] ?? {
+    id: target, name: target, runtime: 'Unknown' as any,
+    description: 'External backend',
+    sensors: { distance: true, light: true, temperature: true, touch: true, acceleration: true },
+    memory: { flashKB: 0, ramKB: 0 },
+    supportsAsync: false, hasDisplay: false, hasRadio: false,
+  }
+
+  let genResult
+  try {
+    genResult = backend.generate(ast, profile)
+  } catch (err) {
+    bag.error('E031', `Code generation failed: ${err}`)
+    return makeResult(false, bag, source, ast)
+  }
+
+  return makeResult(true, bag, source, ast, genResult.code, genResult.sourceMap)
 }
 
-export function validate(source: string): { valid: boolean; errors: CompileError[] } {
-  const result = compile(source, 'esp32')
-  return { valid: result.ok, errors: result.errors ?? [] }
+// ── validate() — check syntax only ───────────────────────────────────────────
+
+export function validate(source: string): { valid: boolean; errors: Diagnostic[]; warnings: Diagnostic[] } {
+  const result = compile(source, 'esp32', { skipSemantic: false, skipLint: true })
+  return { valid: result.ok, errors: result.errors, warnings: result.warnings }
 }
+
+// ── explain() — plain English summary ────────────────────────────────────────
 
 export function explain(source: string): string {
   try {
@@ -129,17 +180,45 @@ export function explain(source: string): string {
   }
 }
 
-function describeTrigger(trigger: { kind: string; [key: string]: unknown }): string {
+// ── getHardwareProfile() ──────────────────────────────────────────────────────
+
+export function getHardwareProfile(target: string): HardwareProfile | undefined {
+  return HARDWARE_PROFILES[target]
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+function makeResult(
+  ok: boolean,
+  bag: DiagnosticBag,
+  source: string,
+  ast?: Program,
+  code?: string,
+  sourceMap?: SourceMap
+): CompileResult {
+  return {
+    ok,
+    code,
+    sourceMap,
+    diagnostics: [...bag.all],
+    errors: bag.errors,
+    warnings: bag.warnings,
+    formattedDiagnostics: bag.all.length > 0 ? formatDiagnostics(bag.all, source) : undefined,
+    ast,
+  }
+}
+
+function describeTrigger(trigger: { kind: string; [k: string]: unknown }): string {
   switch (trigger.kind) {
-    case 'button_a': return 'Button A is pressed'
-    case 'button_b': return 'Button B is pressed'
-    case 'shaken': return 'the robot is shaken'
-    case 'tilted': return 'the robot is tilted'
-    case 'start': return 'the program starts'
-    case 'timer': return `a timer fires`
-    case 'received': return 'a wireless message is received'
+    case 'button_a':  return 'Button A is pressed'
+    case 'button_b':  return 'Button B is pressed'
+    case 'shaken':    return 'the robot is shaken'
+    case 'tilted':    return 'the robot is tilted'
+    case 'start':     return 'the program starts'
+    case 'timer':     return 'a timer fires'
+    case 'received':  return 'a wireless message is received'
     case 'sensor': {
-      const s = trigger as { sensor: string; op: string; threshold: number; unit?: string }
+      const s = trigger as unknown as { sensor: string; op: string; threshold: number; unit?: string }
       return `${s.sensor} ${s.op} ${s.threshold}${s.unit ?? ''}`
     }
     default: return trigger.kind

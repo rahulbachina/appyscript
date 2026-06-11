@@ -1,5 +1,5 @@
-// AppyScript Abstract Syntax Tree
-// Every node in an AppyScript program is one of these types.
+// AppyScript Abstract Syntax Tree — v2
+// Added: SourceLocation threaded through all nodes for source maps & diagnostics
 
 export type Direction = 'forward' | 'backward' | 'left' | 'right'
 
@@ -9,6 +9,11 @@ export type FaceExpression =
 
 export type CompareOp = '<' | '>' | '==' | '<=' | '>='
 export type ArithOp = '+' | '-' | '*' | '/'
+
+export interface SourceLocation {
+  line: number
+  col: number
+}
 
 export interface Duration {
   value: number
@@ -27,7 +32,7 @@ export type Value =
 
 export type SensorName = 'distance' | 'light' | 'temperature' | 'touch' | 'acceleration'
 
-// ── Triggers (what kicks off a `when` block) ──────────────────────────────────
+// ── Triggers ──────────────────────────────────────────────────────────────────
 
 export type Trigger =
   | { kind: 'button_a' }
@@ -39,7 +44,7 @@ export type Trigger =
   | { kind: 'received'; variable?: string }
   | { kind: 'sensor'; sensor: SensorName; op: CompareOp; threshold: number; unit?: string }
 
-// ── Conditions (used in `if` and `while`) ────────────────────────────────────
+// ── Conditions ────────────────────────────────────────────────────────────────
 
 export type Condition =
   | { kind: 'sensor'; sensor: SensorName; op: CompareOp; threshold: number; unit?: string }
@@ -50,8 +55,11 @@ export type Condition =
   | { kind: 'or'; left: Condition; right: Condition }
 
 // ── Statements ────────────────────────────────────────────────────────────────
+// All statements carry optional source location for diagnostics + source maps.
 
-export type Statement =
+export type Statement = StatementNode & { loc?: SourceLocation }
+
+export type StatementNode =
   | { kind: 'move'; direction: Direction; speed?: number; duration?: Duration }
   | { kind: 'turn'; direction: 'left' | 'right'; degrees: number }
   | { kind: 'stop' }
@@ -73,10 +81,11 @@ export type Statement =
 // ── Top-level blocks ──────────────────────────────────────────────────────────
 
 export type Block =
-  | { kind: 'when'; trigger: Trigger; body: Statement[] }
-  | { kind: 'forever'; body: Statement[] }
-  | { kind: 'define'; name: string; body: Statement[] }
+  | { kind: 'when'; trigger: Trigger; body: Statement[]; loc?: SourceLocation }
+  | { kind: 'forever'; body: Statement[]; loc?: SourceLocation }
+  | { kind: 'define'; name: string; body: Statement[]; loc?: SourceLocation }
 
 export interface Program {
   blocks: Block[]
+  source?: string   // original source, for diagnostics
 }

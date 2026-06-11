@@ -1,0 +1,1 @@
+{"version":3,"file":"arduino.d.ts","sourceRoot":"","sources":["../../src/backends/arduino.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,OAAO,EAAqE,MAAM,QAAQ,CAAA;AAExG,OAAO,KAAK,EAAE,eAAe,EAAE,cAAc,EAAE,MAAM,YAAY,CAAA;AA0LjE,eAAO,MAAM,cAAc;;;;sBAIP,OAAO,WAAW,eAAe,GAAG,cAAc;CAGrE,CAAA;AAED,kBAAkB;AAClB,wBAAgB,eAAe,CAAC,OAAO,EAAE,OAAO,GAAG,MAAM,CAMxD"}

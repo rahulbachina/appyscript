@@ -1,38 +1,41 @@
-// AppyScript → MicroPython (ESP32 / M5Stack Core S3 SE) — v2
-// Refactored to extend BaseCodegen. Async event handlers via uasyncio.
+// AppyScript → MicroPython (Raspberry Pi Pico W) — v2
+// Dedicated backend — NOT a string-replace of ESP32 output.
+// Pico uses machine.Pin, machine.PWM, and uasyncio like ESP32,
+// but different pin assignments and no built-in display.
 
 import type { Program, Block, Statement, Trigger, SensorName } from '../ast'
 import { BaseCodegen } from '../codegen/base'
 import type { HardwareProfile, GenerateResult } from '../plugins'
 
-const ESP32_SENSORS: Record<SensorName, string> = {
+const PICO_SENSORS: Record<SensorName, string> = {
   distance:     'robot.sensor.distance()',
-  light:        'robot.sensor.light()',
-  temperature:  'robot.sensor.temperature()',
+  light:        'robot.sensor.ldr()',          // Pico: LDR on ADC pin
+  temperature:  'robot.sensor.temperature()',  // Pico: internal ADC temp
   touch:        'robot.sensor.touch()',
-  acceleration: 'robot.sensor.acceleration_magnitude()',
+  acceleration: '0',                           // Pico W has no built-in IMU
 }
 
-class ESP32Codegen extends BaseCodegen {
+class PicoCodegen extends BaseCodegen {
   protected sensorCall(sensor: SensorName): string {
-    return ESP32_SENSORS[sensor] ?? `robot.sensor.${sensor}()`
+    return PICO_SENSORS[sensor] ?? `robot.sensor.${sensor}()`
   }
 
   generate(program: Program, profile: HardwareProfile): GenerateResult {
     this.lines = []; this.indentLevel = 0; this.definedFunctions.clear()
 
     this.emitHeader(profile.name, profile.runtime)
-    this.emit('from applaa_robot import Robot, wait_ms')
+    this.emit('# Pico W — applaa_robot_pico library required')
+    this.emit('from applaa_robot_pico import Robot, wait_ms')
     this.emit('import uasyncio as asyncio')
+    this.emit('from machine import Pin, PWM, ADC')
     this.emitBlank()
     this.emit('robot = Robot()')
     this.emitBlank()
 
-    const defines   = program.blocks.filter(b => b.kind === 'define')
+    const defines      = program.blocks.filter(b => b.kind === 'define')
     const whenBlocks   = program.blocks.filter(b => b.kind === 'when')
     const foreverBlocks = program.blocks.filter(b => b.kind === 'forever')
 
-    // User-defined behaviours → Python functions
     for (const block of defines) {
       if (block.kind !== 'define') continue
       this.definedFunctions.add(block.name)
@@ -43,12 +46,10 @@ class ESP32Codegen extends BaseCodegen {
       this.emitBlank()
     }
 
-    // Event handlers → async tasks
     for (const block of whenBlocks) {
       if (block.kind === 'when') this.emitWhenHandler(block)
     }
 
-    // Forever loops → async task
     for (const block of foreverBlocks) {
       if (block.kind !== 'forever') continue
       this.emit('async def _forever_loop():', block.loc?.line)
@@ -61,7 +62,6 @@ class ESP32Codegen extends BaseCodegen {
       this.emitBlank()
     }
 
-    // Main coroutine wires everything together
     this.emit('async def main():')
     this.indent()
     this.emit('tasks = []')
@@ -86,14 +86,12 @@ class ESP32Codegen extends BaseCodegen {
     this.emit(`async def _handler_${name}():`, block.loc?.line)
     this.indent()
 
-    const { setup, condition, interval } = this.triggerToPolling(block.trigger)
-    if (setup) this.emit(setup)
+    const { condition, interval } = this.triggerToPolling(block.trigger)
 
     if (condition) {
       this.emit('while True:')
       this.indent()
       if (interval) {
-        // Timer: just run body then sleep
         this.emitStatements(block.body)
         this.emit(`await asyncio.sleep_ms(${interval})`)
       } else {
@@ -105,7 +103,6 @@ class ESP32Codegen extends BaseCodegen {
       }
       this.dedent()
     } else {
-      // One-shot (start)
       this.emitStatements(block.body)
     }
     this.dedent()
@@ -125,25 +122,20 @@ class ESP32Codegen extends BaseCodegen {
     }
   }
 
-  private triggerToPolling(trigger: Trigger): { setup?: string; condition?: string; interval?: number } {
+  private triggerToPolling(trigger: Trigger): { condition?: string; interval?: number } {
     switch (trigger.kind) {
-      case 'button_a':  return { condition: 'robot.button_a()' }
-      case 'button_b':  return { condition: 'robot.button_b()' }
+      case 'button_a':  return { condition: 'robot.button_a.value() == 0' }    // active low
+      case 'button_b':  return { condition: 'robot.button_b.value() == 0' }
       case 'shaken':    return { condition: 'robot.sensor.shaken()' }
-      case 'tilted':    return {
-        condition: trigger.direction
-          ? `robot.sensor.tilted("${trigger.direction}")`
-          : 'robot.sensor.tilted()'
-      }
-      case 'start':     return {}   // one-shot
+      case 'tilted':    return { condition: 'robot.sensor.tilted()' }
+      case 'start':     return {}
       case 'timer': {
         const ms = this.durationMs(trigger.interval)
         return { condition: 'True', interval: ms }
       }
       case 'received':  return { condition: 'robot.radio.received()' }
       case 'sensor': {
-        const call = this.sensorCall(trigger.sensor)
-        return { condition: `${call} ${trigger.op} ${trigger.threshold}` }
+        return { condition: `${this.sensorCall(trigger.sensor)} ${trigger.op} ${trigger.threshold}` }
       }
     }
   }
@@ -159,40 +151,43 @@ class ESP32Codegen extends BaseCodegen {
       case 'move': {
         const speed = stmt.speed ?? 50
         const ms = stmt.duration ? this.durationMs(stmt.duration) : 0
-        this.emit(`robot.move.${stmt.direction}(speed=${speed})`, loc)
+        const duty = Math.round(speed * 655.35)  // 0-65535 for Pico PWM
+        this.emit(`# move ${stmt.direction} at ${speed}%`, loc)
+        this.emit(`robot.drive(direction="${stmt.direction}", duty=${duty})`)
         if (ms > 0) {
           this.emit(`await asyncio.sleep_ms(${ms})`)
-          this.emit('robot.move.stop()')
+          this.emit('robot.stop()')
         }
         break
       }
       case 'turn':
-        this.emit(`robot.move.turn_${stmt.direction}(degrees=${stmt.degrees})`, loc)
+        this.emit(`robot.turn(direction="${stmt.direction}", degrees=${stmt.degrees})`, loc)
         break
       case 'stop':
-        this.emit('robot.move.stop()', loc)
+        this.emit('robot.stop()', loc)
         break
       case 'say':
-        this.emit(`robot.voice.say(${JSON.stringify(stmt.text)})`, loc)
-        this.emit('await asyncio.sleep_ms(500)')
+        // Pico W has no speaker — scroll over UART or optional I2C OLED
+        this.emit(`print(${JSON.stringify(stmt.text)})   # say`, loc)
         break
       case 'play':
-        this.emit(`robot.voice.play(${JSON.stringify(stmt.sound)})`, loc)
+        this.emit(`robot.buzzer.play(${JSON.stringify(stmt.sound)})`, loc)
         break
       case 'show':
-        this.emit(`robot.display.expression(${JSON.stringify(stmt.expression)})`, loc)
+        // Pico has no display — print to serial
+        this.emit(`print("expression: ${stmt.expression}")`, loc)
         break
       case 'show_text':
-        this.emit(`robot.display.show(${JSON.stringify(stmt.text)})`, loc)
+        this.emit(`print(${JSON.stringify(stmt.text)})`, loc)
         break
       case 'show_number':
-        this.emit(`robot.display.number(${this.emitValue(stmt.value)})`, loc)
+        this.emit(`print(${this.emitValue(stmt.value)})`, loc)
         break
       case 'wait':
         this.emit(`await asyncio.sleep_ms(${this.durationMs(stmt.duration)})`, loc)
         break
       case 'send':
-        this.emit(`robot.radio.send(${this.emitValue(stmt.message)})`, loc)
+        this.emit(`robot.radio.send(str(${this.emitValue(stmt.message)}))`, loc)
         break
       case 'let':
         this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
@@ -201,32 +196,22 @@ class ESP32Codegen extends BaseCodegen {
         this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
         break
       case 'remember':
-        this.emit(`robot.brain.remember(${JSON.stringify(stmt.name)}, ${stmt.name})`, loc)
+        this.emit(`robot.nvm.save(${JSON.stringify(stmt.name)}, ${stmt.name})`, loc)
         break
       case 'do':
-        if (this.definedFunctions.has(stmt.name)) {
-          this.emit(`${stmt.name}()`, loc)
-        } else {
-          this.emit(`# Warning: '${stmt.name}' is not defined`, loc)
-        }
+        this.emit(this.definedFunctions.has(stmt.name) ? `${stmt.name}()` : `# Warning: '${stmt.name}' not defined`, loc)
         break
       case 'if':
         this.emit(`if ${this.emitCondition(stmt.condition)}:`, loc)
-        this.indent()
-        this.emitStatements(stmt.then)
-        this.dedent()
+        this.indent(); this.emitStatements(stmt.then); this.dedent()
         if (stmt.else) {
           this.emit('else:')
-          this.indent()
-          this.emitStatements(stmt.else)
-          this.dedent()
+          this.indent(); this.emitStatements(stmt.else); this.dedent()
         }
         break
       case 'repeat':
         this.emit(`for _i in range(${this.emitValue(stmt.count)}):`, loc)
-        this.indent()
-        this.emitStatements(stmt.body)
-        this.dedent()
+        this.indent(); this.emitStatements(stmt.body); this.dedent()
         break
       case 'while':
         this.emit(`while ${this.emitCondition(stmt.condition)}:`, loc)
@@ -239,21 +224,19 @@ class ESP32Codegen extends BaseCodegen {
   }
 }
 
-export const esp32Backend = {
-  targetId: 'esp32',
-  name: 'ESP32 MicroPython Backend',
+export const picoBackend = {
+  targetId: 'pico',
+  name: 'Raspberry Pi Pico W MicroPython Backend',
   version: '2.0.0',
   generate(program: Program, profile: HardwareProfile): GenerateResult {
-    return new ESP32Codegen().generate(program, profile)
+    return new PicoCodegen().generate(program, profile)
   },
 }
 
-/** @deprecated Use esp32Backend.generate() */
-export function generateESP32(program: Program): string {
-  const { code } = new ESP32Codegen().generate(program, {
-    id: 'esp32', name: 'ESP32', runtime: 'MicroPython',
-    description: '', sensors: { distance: true, light: true, temperature: true, touch: true, acceleration: true },
-    memory: { flashKB: 8192, ramKB: 512 }, supportsAsync: true, hasDisplay: true, hasRadio: true,
-  })
-  return code
+export function generatePico(program: Program): string {
+  return picoBackend.generate(program, {
+    id: 'pico', name: 'Raspberry Pi Pico W', runtime: 'MicroPython',
+    description: '', sensors: { distance: true, light: true, temperature: true, touch: true, acceleration: false },
+    memory: { flashKB: 2048, ramKB: 264 }, supportsAsync: true, hasDisplay: false, hasRadio: true,
+  }).code
 }
