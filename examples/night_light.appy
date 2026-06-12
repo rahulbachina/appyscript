@@ -1,0 +1,21 @@
+# Night Light
+# What it teaches: light sensor events, expressions
+# Works on: esp32, arduino, pico, microbit
+
+when start
+  say "Night light ready! I watch the room for you."
+  show calm
+end
+
+when light < 20%
+  show happy
+  show text "LIGHT ON"
+  play "success"
+  say "It's dark, turning on my glow!"
+end
+
+when light > 60%
+  show sleep
+  show text "LIGHT OFF"
+  say "Nice and bright, light off."
+end

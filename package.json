@@ -28,7 +28,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "npm run build && node --test dist/test/",
+    "test": "npm run build && node --test dist/test/compiler.test.js",
     "mcp": "node dist/mcp/server.js",
     "lint": "tsc --noEmit"
   },

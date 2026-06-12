@@ -14,6 +14,7 @@ import { compile, validate, explain, TARGETS, KEYWORDS } from './compiler'
 import { simulate } from './simulation/simulator'
 import { tokenize } from './lexer'
 import { parse } from './parser'
+import { skillsCommand } from './skills-installer'
 
 const args = process.argv.slice(2)
 const command = args[0]
@@ -195,6 +196,12 @@ switch (command) {
     break
   }
 
+  case 'skills': {
+    // Robotics Skills Database installer — async, keeps event loop alive until done
+    void skillsCommand(args.slice(1))
+    break
+  }
+
   default: {
     console.log(`
 AppyScript v2 — The English-first robotics language
@@ -206,8 +213,9 @@ Usage:
   appyscript simulate  <file.appy> [--sensor-distance=50] [--button-a] [--shaken]
   appyscript list-targets
   appyscript list-keywords
+  appyscript skills    list | add <name> [--all] [--agent claude|cursor|codex]
 
-Targets: esp32 | arduino | pico | microbit
+Targets: esp32 | arduino | pico | microbit | circuitpython
 `)
     break
   }

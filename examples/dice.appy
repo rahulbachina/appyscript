@@ -1,0 +1,21 @@
+# Shake the Dice
+# What it teaches: random numbers, shake events, if/else
+# Works on: esp32, pico, microbit
+
+when start
+  say "Shake me to roll the dice!"
+  show happy
+end
+
+when shaken
+  show dizzy
+  wait 500ms
+  let roll = pick random 1 to 6
+  say "You rolled " + roll
+  if roll > 4
+    show excited
+    play "success"
+  else
+    show calm
+  end
+end

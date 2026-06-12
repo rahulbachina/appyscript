@@ -1,0 +1,30 @@
+# Pet Robot
+# What it teaches: variables, timer events, if/else, expressions
+# Works on: esp32, arduino, pico, microbit
+
+when start
+  let happiness = 5
+  show happy
+  say "I'm your pet robot! Press my buttons to play with me!"
+end
+
+when button_a pressed
+  set happiness to happiness + 2
+  show excited
+  play "success"
+  say "Yay! I love you!"
+end
+
+when button_b pressed
+  set happiness to happiness + 1
+  show happy
+  say "Thanks for the pat!"
+end
+
+every 10s
+  set happiness to happiness - 1
+  if happiness < 3
+    show sad
+    say "I feel ignored... play with me!"
+  end
+end

@@ -1,0 +1,23 @@
+# Fortune Teller
+# What it teaches: lists, random numbers, item lookup
+# Works on: esp32, pico, microbit
+
+when start
+  let fortunes = list
+  add "Yes!" to fortunes
+  add "No way." to fortunes
+  add "Ask again later." to fortunes
+  add "Definitely!" to fortunes
+  add "Hmm... maybe." to fortunes
+  say "Think of a question, then shake me!"
+  show thinking
+end
+
+when shaken
+  show dizzy
+  wait 1000ms
+  let n = pick random 1 to 5
+  let answer = item n of fortunes
+  say answer
+  show happy
+end

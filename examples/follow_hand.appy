@@ -1,0 +1,28 @@
+# Follow My Hand
+# What it teaches: distance sensor, forever loops, nested if/else
+# Works on: esp32, arduino, pico
+
+when start
+  say "Hold your hand in front of me and move it slowly!"
+  show happy
+  forever
+    if distance < 15cm
+      back at 40% for 1s
+      show confused
+    else
+      if distance < 25cm
+        stop
+        show happy
+      else
+        move forward at 40% for 1s
+        show thinking
+      end
+    end
+  end
+end
+
+when button_a pressed
+  stop
+  say "Okay, taking a break!"
+  show calm
+end

@@ -1,0 +1,30 @@
+# Step Counter
+# What it teaches: variables, shake events, remember (saving data)
+# Works on: esp32, pico, microbit
+
+when start
+  let steps = 0
+  say "Strap me on and start walking!"
+  show happy
+end
+
+when shaken
+  change steps by 1
+  remember steps
+  say "Steps: " + steps
+  if steps > 100
+    show excited
+    play "success"
+  end
+end
+
+when button_a pressed
+  say "Total steps today: " + steps
+end
+
+when button_b pressed
+  set steps to 0
+  remember steps
+  say "Counter reset!"
+  show calm
+end

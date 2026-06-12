@@ -1,0 +1,26 @@
+# Reaction Game
+# What it teaches: random numbers, while loops, button events
+# Works on: esp32, arduino, pico, microbit
+
+when start
+  say "Watch the screen. Press A the moment you see GO!"
+  show thinking
+  let delay = pick random 2 to 6
+  while delay > 0
+    wait 1000ms
+    set delay to delay - 1
+  end
+  show text "GO!"
+  show excited
+end
+
+when button_a pressed
+  play "success"
+  show happy
+  say "Fast fingers! You win!"
+end
+
+when button_b pressed
+  show confused
+  say "Wrong button! Press A!"
+end

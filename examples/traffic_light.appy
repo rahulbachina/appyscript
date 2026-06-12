@@ -1,0 +1,18 @@
+# Traffic Light
+# What it teaches: forever loops, wait, expressions, show text
+# Works on: esp32, arduino, pico, microbit
+
+when start
+  say "Traffic light starting!"
+  forever
+    show text "RED"
+    show angry
+    wait 3000ms
+    show text "GREEN"
+    show happy
+    wait 3000ms
+    show text "YELLOW"
+    show alert
+    wait 1000ms
+  end
+end

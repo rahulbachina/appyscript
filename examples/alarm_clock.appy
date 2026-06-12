@@ -1,0 +1,28 @@
+# Alarm Clock
+# What it teaches: while loops, variables as flags, countdowns
+# Works on: esp32, arduino, pico, microbit
+
+when start
+  let ringing = 0
+  let seconds = 10
+  say "Alarm set for 10 seconds. Sweet dreams!"
+  show sleep
+  while seconds > 0
+    wait 1000ms
+    set seconds to seconds - 1
+  end
+  set ringing to 1
+  show alert
+  while ringing > 0
+    say "WAKE UP!"
+    play "success"
+    wait 1000ms
+  end
+  show calm
+  say "Good morning!"
+end
+
+when button_a pressed
+  set ringing to 0
+  show happy
+end

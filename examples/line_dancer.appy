@@ -1,0 +1,32 @@
+# Line Dancer
+# What it teaches: functions, repeat loops, movement
+# Works on: esp32, arduino, pico
+
+define wiggle
+  turn left 45°
+  turn right 90°
+  turn left 45°
+end
+
+define strut
+  move forward at 60% for 1s
+  back at 60% for 1s
+end
+
+when button_a pressed
+  say "Let's dance!"
+  show excited
+  repeat 4 times
+    do wiggle
+    do strut
+  end
+  spin right 360°
+  play "success"
+  show happy
+end
+
+when button_b pressed
+  stop
+  say "Dance break!"
+  show calm
+end
