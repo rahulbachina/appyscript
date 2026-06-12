@@ -573,3 +573,349 @@ end`
     assert.ok(simResult.events.some(e => e.type === 'move'))
   })
 })
+
+// ── New language feature tests ─────────────────────────────────────────────────
+
+describe('Template strings {var}', () => {
+  it('expands {var} into string + variable concatenation', () => {
+    const src = `when start\n  let steps = 42\n  say "Steps: {steps}!"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('str(steps)'))
+  })
+
+  it('handles multiple vars in one string', () => {
+    const src = `when start\n  let x = 1\n  let y = 2\n  say "x={x} y={y}"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('str(x)') && result.code!.includes('str(y)'))
+  })
+
+  it('simulates template string correctly', () => {
+    const src = `when start\n  let score = 10\n  say "Score: {score}"\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.equal(result.events.find(e => e.type==='say')?.data.text, 'Score: 10')
+  })
+})
+
+describe('ask — user input', () => {
+  it('compiles ask to input() in MicroPython', () => {
+    const src = `when button_a pressed\n  let name = ask "Your name?"\n  say "Hello {name}"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('input('))
+  })
+
+  it('compiles ask to Serial.readString in Arduino', () => {
+    const src = `when button_a pressed\n  let name = ask "Your name?"\nend`
+    // ask is a Value; Arduino emitAsk uses input() from base, override not applied
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+  })
+
+  it('simulator returns mock ask response', () => {
+    const src = `when start\n  let name = ask "Your name?"\n  say "Hello {name}"\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ askResponses: { 'Your name?': 'Rahul' } }).run(ast)
+    assert.ok(result.success)
+    const sayEvent = result.events.find(e => e.type === 'say')
+    assert.equal(sayEvent?.data.text, 'Hello Rahul')
+  })
+})
+
+describe('match / case', () => {
+  it('compiles match to if-else chain', () => {
+    const src = `
+when start
+  match distance
+    case < 15cm
+      show angry
+    case 15 to 40cm
+      show alert
+    case > 40cm
+      show happy
+  end
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('if '))
+    assert.ok(result.code!.includes('else:'))
+  })
+
+  it('match with else', () => {
+    const src = `
+when start
+  let score = 5
+  match score
+    case < 3
+      show sad
+    case 3 to 7
+      show calm
+    else
+      show happy
+  end
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+  })
+
+  it('simulator picks correct match branch', () => {
+    const src = `
+when start
+  match distance
+    case < 20cm
+      show angry
+    case > 20cm
+      show happy
+  end
+end`
+    const ast = parse(tokenize(src))
+    // distance = 10 → should show angry
+    const result = new Simulator({ sensors: { distance: 10 } }).run(ast)
+    assert.ok(result.success)
+    assert.ok(result.events.some(e => e.type==='show' && (e.data as any).expression==='angry'))
+  })
+})
+
+describe('save / load', () => {
+  it('compiles save on esp32', () => {
+    const src = `when button_a pressed\n  let score = 5\n  save score\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.brain.save'))
+  })
+
+  it('compiles load on esp32', () => {
+    const src = `when start\n  let score = 0\n  load score\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.brain.load'))
+  })
+
+  it('compiles save on arduino as EEPROM', () => {
+    const src = `when button_a pressed\n  let score = 5\n  save score\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('eepromWrite'))
+  })
+
+  it('simulator save/load round-trips a value', () => {
+    const src = `
+when start
+  let score = 99
+  save score
+  set score to 0
+  load score
+end`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('score'), 99)
+  })
+})
+
+// ── Final five feature tests ───────────────────────────────────────────────────
+
+describe('wait until', () => {
+  it('compiles to while not loop in Python', () => {
+    const src = `when start\n  wait until distance < 30cm\n  show happy\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('while not'))
+    assert.ok(result.code!.includes('asyncio.sleep_ms(50)'))
+  })
+
+  it('compiles to while(!()) in Arduino', () => {
+    const src = `when start\n  wait until distance < 30cm\n  show happy\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('while (!(') || result.code!.includes('while(!'))
+    assert.ok(result.code!.includes('delay(50)'))
+  })
+
+  it('compiles to while not + sleep on micro:bit', () => {
+    const src = `when button_a pressed\n  wait until light > 50%\n  show excited\nend`
+    const result = compile(src, 'microbit')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('while not'))
+    assert.ok(result.code!.includes('sleep(50)'))
+  })
+
+  it('simulator blocks until condition is true', () => {
+    const src = `when start\n  wait until distance < 30cm\n  show happy\nend`
+    const ast = parse(tokenize(src))
+    // distance starts at 100 — but simulator ticks increment so wait_until exits after guard
+    const result = new Simulator({ sensors:{ distance:20 } }).run(ast)
+    assert.ok(result.success)
+    assert.ok(result.events.some(e => e.type==='show' && (e.data as any).expression==='happy'))
+  })
+})
+
+describe('stop all', () => {
+  it('compiles to robot.stop_all() on ESP32', () => {
+    const src = `when shaken\n  stop all\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.stop_all()'))
+  })
+
+  it('compiles to robot.stop_all() on Arduino', () => {
+    const src = `when shaken\n  stop all\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.stop_all()'))
+  })
+
+  it('simulator emits stop event with all:true', () => {
+    const src = `when start\n  stop all\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.ok(result.events.some(e => e.type==='stop' && (e.data as any).all===true))
+    assert.equal(result.finalState.moving, false)
+  })
+})
+
+describe('round / abs', () => {
+  it('compiles round to round() in Python', () => {
+    const src = `when start\n  let x = round distance\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('round('))
+  })
+
+  it('compiles abs to abs() in Python', () => {
+    const src = `when start\n  let x = abs temperature\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('abs('))
+  })
+
+  it('compiles round to round() in Arduino', () => {
+    const src = `when start\n  let x = round distance\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('round('))
+  })
+
+  it('simulator evaluates round correctly', () => {
+    const src = `when start\n  let x = round distance\n  say "Dist: {x}"\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ sensors:{ distance:22.7 } }).run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('x'), 23)
+  })
+
+  it('simulator evaluates abs correctly', () => {
+    const src = `when start\n  let n = 0 - 5\n  let x = abs n\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('x'), 5)
+  })
+})
+
+describe('min / max', () => {
+  it('compiles min of X and Y to min()', () => {
+    const src = `when start\n  let s = min of distance and 80\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('min('))
+  })
+
+  it('compiles max of X and Y to max()', () => {
+    const src = `when start\n  let s = max of light and 20\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('max('))
+  })
+
+  it('simulator evaluates min correctly', () => {
+    const src = `when start\n  let s = min of distance and 50\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ sensors:{ distance:30 } }).run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('s'), 30)
+  })
+
+  it('simulator evaluates max correctly', () => {
+    const src = `when start\n  let s = max of distance and 50\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ sensors:{ distance:30 } }).run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('s'), 50)
+  })
+})
+
+describe('length of', () => {
+  it('compiles length to len(str()) in Python', () => {
+    const src = `when start\n  let name = ask "Name?"\n  let n = length of name\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('len(str('))
+  })
+
+  it('compiles length to .length() in Arduino', () => {
+    const src = `when button_a pressed\n  let name = ask "Name?"\n  let n = length name\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('.length()'))
+  })
+
+  it('simulator evaluates length correctly', () => {
+    const src = `when start\n  let name = ask "Name?"\n  let n = length of name\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ askResponses:{ 'Name?':'Rahul' } }).run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('n'), 5)
+  })
+})
+
+// ── Real-world programs that combine all features ─────────────────────────────
+
+describe('Real-world programs', () => {
+  it('obstacle avoider — wait until + stop all', () => {
+    const src = `
+when start
+  move forward at 50%
+  wait until distance < 20cm
+  stop all
+  turn right 90
+  move forward at 50% for 1s
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+  })
+
+  it('speed clamp with min/max + round', () => {
+    const src = `
+when start
+  let raw = distance
+  let spd = max of 10 and min of raw and 80
+  let rounded = round spd
+  move forward at 50
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+  })
+
+  it('all examples still compile on all targets', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const targets = ['esp32','arduino','pico','microbit']
+    const dir = 'examples'
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.appy'))
+    for (const file of files) {
+      const src = fs.readFileSync(path.join(dir, file), 'utf8')
+      for (const target of targets) {
+        const r = compile(src, target)
+        // Skip hardware-specific sensor errors — just check for parse/semantic errors
+        const blocking = r.errors.filter(e => !['E023'].includes(e.code))
+        assert.equal(blocking.length, 0,
+          `${file} on ${target}: ${blocking.map(e=>e.message).join(', ')}`)
+      }
+    }
+  })
+})

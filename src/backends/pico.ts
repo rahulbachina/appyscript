@@ -1,242 +1,129 @@
-// AppyScript → MicroPython (Raspberry Pi Pico W) — v2
-// Dedicated backend — NOT a string-replace of ESP32 output.
-// Pico uses machine.Pin, machine.PWM, and uasyncio like ESP32,
-// but different pin assignments and no built-in display.
+// AppyScript → Raspberry Pi Pico W MicroPython — v5
 
 import type { Program, Block, Statement, Trigger, SensorName } from '../ast'
 import { BaseCodegen } from '../codegen/base'
 import type { HardwareProfile, GenerateResult } from '../plugins'
 
-const PICO_SENSORS: Record<SensorName, string> = {
-  distance:     'robot.sensor.distance()',
-  light:        'robot.sensor.ldr()',          // Pico: LDR on ADC pin
-  temperature:  'robot.sensor.temperature()',  // Pico: internal ADC temp
-  touch:        'robot.sensor.touch()',
-  acceleration: '0',                           // Pico W has no built-in IMU
+const S: Record<SensorName,string> = {
+  distance:'robot.sensor.distance()', light:'robot.sensor.ldr()',
+  temperature:'robot.sensor.temperature()', touch:'robot.sensor.touch()', acceleration:'0',
 }
 
-class PicoCodegen extends BaseCodegen {
-  protected sensorCall(sensor: SensorName): string {
-    return PICO_SENSORS[sensor] ?? `robot.sensor.${sensor}()`
-  }
+class Gen extends BaseCodegen {
+  protected sensorCall(s: SensorName) { return S[s] }
 
   generate(program: Program, profile: HardwareProfile): GenerateResult {
-    this.lines = []; this.indentLevel = 0; this.definedFunctions.clear()
-
+    this.lines=[]; this.indentLevel=0; this.definedFunctions.clear()
     this.emitHeader(profile.name, profile.runtime)
-    this.emit('# Pico W — applaa_robot_pico library required')
-    this.emit('from applaa_robot_pico import Robot, wait_ms')
-    this.emit('import uasyncio as asyncio')
+    this.emit('from applaa_robot_pico import Robot')
+    this.emit('import uasyncio as asyncio, random')
     this.emit('from machine import Pin, PWM, ADC')
-    this.emitBlank()
-    this.emit('robot = Robot()')
-    this.emitBlank()
+    this.emitBlank(); this.emit('robot = Robot()'); this.emitBlank()
 
-    const defines      = program.blocks.filter(b => b.kind === 'define')
-    const whenBlocks   = program.blocks.filter(b => b.kind === 'when')
-    const foreverBlocks = program.blocks.filter(b => b.kind === 'forever')
+    const defines  = program.blocks.filter(b=>b.kind==='define')
+    const whens    = program.blocks.filter(b=>b.kind==='when')
+    const forevers = program.blocks.filter(b=>b.kind==='forever')
 
-    for (const block of defines) {
-      if (block.kind !== 'define') continue
-      this.definedFunctions.add(block.name)
-      this.emit(`def ${block.name}():`, block.loc?.line)
-      this.indent()
-      this.emitStatements(block.body)
-      this.dedent()
-      this.emitBlank()
+    for (const b of defines) {
+      if (b.kind!=='define') continue
+      this.definedFunctions.add(b.name)
+      this.emit(`def ${b.name}():`,b.loc?.line); this.indent(); this.stmts(b.body); this.dedent(); this.emitBlank()
     }
-
-    for (const block of whenBlocks) {
-      if (block.kind === 'when') this.emitWhenHandler(block)
+    for (const b of whens) { if (b.kind==='when') this.handler(b) }
+    for (const b of forevers) {
+      if (b.kind!=='forever') continue
+      this.emit('async def _forever_loop():', b.loc?.line); this.indent()
+      this.emit('while True:'); this.indent(); this.stmts(b.body); this.emit('await asyncio.sleep_ms(10)')
+      this.dedent(); this.dedent(); this.emitBlank()
     }
-
-    for (const block of foreverBlocks) {
-      if (block.kind !== 'forever') continue
-      this.emit('async def _forever_loop():', block.loc?.line)
-      this.indent()
-      this.emit('while True:')
-      this.indent()
-      this.emitStatements(block.body)
-      this.emit('await asyncio.sleep_ms(10)')
-      this.dedent(); this.dedent()
-      this.emitBlank()
-    }
-
-    this.emit('async def main():')
-    this.indent()
-    this.emit('tasks = []')
-    for (const block of whenBlocks) {
-      if (block.kind === 'when') {
-        this.emit(`tasks.append(asyncio.create_task(_handler_${this.triggerName(block.trigger)}()))`)
-      }
-    }
-    if (foreverBlocks.length > 0) {
-      this.emit('tasks.append(asyncio.create_task(_forever_loop()))')
-    }
-    this.emit('await asyncio.gather(*tasks)')
-    this.dedent()
-    this.emitBlank()
-    this.emit('asyncio.run(main())')
-
+    this.emit('async def main():'); this.indent(); this.emit('tasks = []')
+    for (const b of whens) if (b.kind==='when') this.emit(`tasks.append(asyncio.create_task(_handler_${this.tname(b.trigger)}()))`)
+    if (forevers.length>0) this.emit('tasks.append(asyncio.create_task(_forever_loop()))')
+    this.emit('await asyncio.gather(*tasks)'); this.dedent()
+    this.emitBlank(); this.emit('asyncio.run(main())')
     return this.result()
   }
 
-  private emitWhenHandler(block: Extract<Block, { kind: 'when' }>) {
-    const name = this.triggerName(block.trigger)
-    this.emit(`async def _handler_${name}():`, block.loc?.line)
-    this.indent()
-
-    const { condition, interval } = this.triggerToPolling(block.trigger)
-
-    if (condition) {
-      this.emit('while True:')
-      this.indent()
-      if (interval) {
-        this.emitStatements(block.body)
-        this.emit(`await asyncio.sleep_ms(${interval})`)
-      } else {
-        this.emit(`if ${condition}:`)
-        this.indent()
-        this.emitStatements(block.body)
-        this.dedent()
-        this.emit('await asyncio.sleep_ms(50)')
-      }
+  private handler(b: Extract<Block,{kind:'when'}>) {
+    const name=this.tname(b.trigger)
+    this.emit(`async def _handler_${name}():`,b.loc?.line); this.indent()
+    const {cond,ms}=this.tpoll(b.trigger)
+    if (cond) {
+      this.emit('while True:'); this.indent()
+      if (ms) { this.stmts(b.body); this.emit(`await asyncio.sleep_ms(${ms})`) }
+      else    { this.emit(`if ${cond}:`); this.indent(); this.stmts(b.body); this.dedent(); this.emit('await asyncio.sleep_ms(50)') }
       this.dedent()
-    } else {
-      this.emitStatements(block.body)
-    }
-    this.dedent()
-    this.emitBlank()
+    } else { this.stmts(b.body) }
+    this.dedent(); this.emitBlank()
   }
 
-  private triggerName(trigger: Trigger): string {
-    switch (trigger.kind) {
-      case 'button_a': return 'button_a'
-      case 'button_b': return 'button_b'
-      case 'shaken':   return 'shaken'
-      case 'tilted':   return `tilted${trigger.direction ? '_' + trigger.direction : ''}`
-      case 'start':    return 'start'
-      case 'timer':    return `timer_${this.durationMs(trigger.interval)}ms`
-      case 'received': return 'received'
-      case 'sensor':   return `sensor_${trigger.sensor}`
+  private tname(t: Trigger): string {
+    switch(t.kind) {
+      case 'button_a': return 'button_a'; case 'button_b': return 'button_b'
+      case 'shaken': return 'shaken'; case 'tilted': return `tilted${t.direction?'_'+t.direction:''}`
+      case 'start': return 'start'; case 'timer': return `timer_${this.durationMs(t.interval)}ms`
+      case 'received': return 'received'; case 'sensor': return `sensor_${t.sensor}`
     }
   }
 
-  private triggerToPolling(trigger: Trigger): { condition?: string; interval?: number } {
-    switch (trigger.kind) {
-      case 'button_a':  return { condition: 'robot.button_a.value() == 0' }    // active low
-      case 'button_b':  return { condition: 'robot.button_b.value() == 0' }
-      case 'shaken':    return { condition: 'robot.sensor.shaken()' }
-      case 'tilted':    return { condition: 'robot.sensor.tilted()' }
-      case 'start':     return {}
-      case 'timer': {
-        const ms = this.durationMs(trigger.interval)
-        return { condition: 'True', interval: ms }
-      }
-      case 'received':  return { condition: 'robot.radio.received()' }
-      case 'sensor': {
-        return { condition: `${this.sensorCall(trigger.sensor)} ${trigger.op} ${trigger.threshold}` }
-      }
+  private tpoll(t: Trigger): {cond?:string; ms?:number} {
+    switch(t.kind) {
+      case 'button_a': return {cond:'robot.button_a.value()==0'}
+      case 'button_b': return {cond:'robot.button_b.value()==0'}
+      case 'shaken':   return {cond:'robot.sensor.shaken()'}
+      case 'tilted':   return {cond:'robot.sensor.tilted()'}
+      case 'start':    return {}
+      case 'timer':    return {cond:'True', ms:this.durationMs(t.interval)}
+      case 'received': return {cond:'robot.radio.received()'}
+      case 'sensor':   return {cond:`${this.sensorCall(t.sensor)} ${t.op} ${t.threshold}`}
     }
   }
 
-  private emitStatements(stmts: Statement[]) {
-    if (stmts.length === 0) { this.emit('pass'); return }
-    for (const stmt of stmts) this.emitStatement(stmt)
+  private stmts(ss: Statement[]) {
+    if (ss.length===0) { this.emit('pass'); return }
+    for (const s of ss) this.stmt(s)
   }
 
-  private emitStatement(stmt: Statement) {
-    const loc = stmt.loc?.line
-    switch (stmt.kind) {
+  private stmt(s: Statement) {
+    const l=s.loc?.line
+    switch(s.kind) {
       case 'move': {
-        const speed = stmt.speed ?? 50
-        const ms = stmt.duration ? this.durationMs(stmt.duration) : 0
-        const duty = Math.round(speed * 655.35)  // 0-65535 for Pico PWM
-        this.emit(`# move ${stmt.direction} at ${speed}%`, loc)
-        this.emit(`robot.drive(direction="${stmt.direction}", duty=${duty})`)
-        if (ms > 0) {
-          this.emit(`await asyncio.sleep_ms(${ms})`)
-          this.emit('robot.stop()')
-        }
-        break
-      }
-      case 'turn':
-        this.emit(`robot.turn(direction="${stmt.direction}", degrees=${stmt.degrees})`, loc)
-        break
-      case 'stop':
-        this.emit('robot.stop()', loc)
-        break
-      case 'say':
-        // Pico W has no speaker — scroll over UART or optional I2C OLED
-        this.emit(`print(${JSON.stringify(stmt.text)})   # say`, loc)
-        break
-      case 'play':
-        this.emit(`robot.buzzer.play(${JSON.stringify(stmt.sound)})`, loc)
-        break
-      case 'show':
-        // Pico has no display — print to serial
-        this.emit(`print("expression: ${stmt.expression}")`, loc)
-        break
-      case 'show_text':
-        this.emit(`print(${JSON.stringify(stmt.text)})`, loc)
-        break
-      case 'show_number':
-        this.emit(`print(${this.emitValue(stmt.value)})`, loc)
-        break
-      case 'wait':
-        this.emit(`await asyncio.sleep_ms(${this.durationMs(stmt.duration)})`, loc)
-        break
-      case 'send':
-        this.emit(`robot.radio.send(str(${this.emitValue(stmt.message)}))`, loc)
-        break
-      case 'let':
-        this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
-        break
-      case 'set':
-        this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
-        break
-      case 'remember':
-        this.emit(`robot.nvm.save(${JSON.stringify(stmt.name)}, ${stmt.name})`, loc)
-        break
-      case 'do':
-        this.emit(this.definedFunctions.has(stmt.name) ? `${stmt.name}()` : `# Warning: '${stmt.name}' not defined`, loc)
-        break
+        const duty=Math.round((s.speed??50)*655.35), ms=s.duration?this.durationMs(s.duration):0
+        this.emit(`robot.drive(direction="${s.direction}", duty=${duty})`,l)
+        if (ms>0) { this.emit(`await asyncio.sleep_ms(${ms})`); this.emit('robot.stop()') }
+        break }
+      case 'turn':       this.emit(`robot.turn(direction="${s.direction}", degrees=${s.degrees})`,l); break
+      case 'stop':       this.emit('robot.stop()',l); break
+      case 'stop_all':   this.emit('robot.stop_all()',l); break
+      case 'say':        this.emit(`print(${this.emitStr(s.text)})`,l); break
+      case 'play':       this.emit(`robot.buzzer.play(${JSON.stringify(s.sound)})`,l); break
+      case 'show':       this.emit(`print("expression: ${s.expression}")`,l); break
+      case 'show_text':  this.emit(`print(${this.emitStr(s.text)})`,l); break
+      case 'show_number':this.emit(`print(${this.emitValue(s.value)})`,l); break
+      case 'wait':       this.emit(`await asyncio.sleep_ms(${this.durationMs(s.duration)})`,l); break
+      case 'wait_until': this.emitWaitUntilAsync(s.condition, l); break
+      case 'send':       this.emit(`robot.radio.send(str(${this.emitValue(s.message)}))`,l); break
+      case 'let':        this.emit(`${s.name} = ${this.emitValue(s.value)}`,l); break
+      case 'set':        this.emit(`${s.name} = ${this.emitValue(s.value)}`,l); break
+      case 'remember':   this.emit(`robot.nvm.save(${JSON.stringify(s.name)}, ${s.name})`,l); break
+      case 'save':       this.emit(`robot.nvm.save(${JSON.stringify(s.name)}, ${s.name})`,l); break
+      case 'load':       this.emit(`${s.name} = robot.nvm.load(${JSON.stringify(s.name)}, 0)`,l); break
+      case 'list_add':   this.emit(`${s.list}.append(${this.emitValue(s.value)})`,l); break
+      case 'do':         this.emit(this.definedFunctions.has(s.name)?`${s.name}()`:`# '${s.name}' not defined`,l); break
       case 'if':
-        this.emit(`if ${this.emitCondition(stmt.condition)}:`, loc)
-        this.indent(); this.emitStatements(stmt.then); this.dedent()
-        if (stmt.else) {
-          this.emit('else:')
-          this.indent(); this.emitStatements(stmt.else); this.dedent()
-        }
-        break
+        this.emit(`if ${this.emitCond(s.condition)}:`,l); this.indent(); this.stmts(s.then); this.dedent()
+        if (s.else) { this.emit('else:'); this.indent(); this.stmts(s.else); this.dedent() }; break
       case 'repeat':
-        this.emit(`for _i in range(${this.emitValue(stmt.count)}):`, loc)
-        this.indent(); this.emitStatements(stmt.body); this.dedent()
-        break
+        this.emit(`for _i in range(${this.emitValue(s.count)}):`,l); this.indent(); this.stmts(s.body); this.dedent(); break
       case 'while':
-        this.emit(`while ${this.emitCondition(stmt.condition)}:`, loc)
-        this.indent()
-        this.emitStatements(stmt.body)
-        this.emit('await asyncio.sleep_ms(10)')
-        this.dedent()
-        break
+        this.emit(`while ${this.emitCond(s.condition)}:`,l); this.indent()
+        this.stmts(s.body); this.emit('await asyncio.sleep_ms(10)'); this.dedent(); break
     }
   }
 }
 
 export const picoBackend = {
-  targetId: 'pico',
-  name: 'Raspberry Pi Pico W MicroPython Backend',
-  version: '2.0.0',
-  generate(program: Program, profile: HardwareProfile): GenerateResult {
-    return new PicoCodegen().generate(program, profile)
-  },
+  targetId:'pico', name:'Raspberry Pi Pico W MicroPython Backend', version:'5.0.0',
+  generate(p: Program, prof: HardwareProfile): GenerateResult { return new Gen().generate(p,prof) },
 }
-
-export function generatePico(program: Program): string {
-  return picoBackend.generate(program, {
-    id: 'pico', name: 'Raspberry Pi Pico W', runtime: 'MicroPython',
-    description: '', sensors: { distance: true, light: true, temperature: true, touch: true, acceleration: false },
-    memory: { flashKB: 2048, ramKB: 264 }, supportsAsync: true, hasDisplay: false, hasRadio: true,
-  }).code
-}
+export function generatePico(p: Program): string { return picoBackend.generate(p,{id:'pico',name:'Raspberry Pi Pico W',runtime:'MicroPython',description:'',sensors:{distance:true,light:true,temperature:true,touch:true,acceleration:false},memory:{flashKB:2048,ramKB:264},supportsAsync:true,hasDisplay:false,hasRadio:true}).code }

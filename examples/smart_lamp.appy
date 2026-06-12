@@ -1,0 +1,35 @@
+# Smart Lamp  (home automation — compiles to JSON device commands)
+# What it teaches: save/load, match/case, template strings
+# Works on: home, esp32
+
+when start
+  let brightness = 50
+  load brightness
+  say "Lamp on at {brightness}%"
+end
+
+when button_a pressed
+  change brightness by 10
+  if brightness > 100
+    set brightness to 100
+  end
+  save brightness
+  say "Brightness: {brightness}%"
+end
+
+when button_b pressed
+  set brightness to 0
+  save brightness
+  say "Lamp off"
+end
+
+every 1m
+  match brightness
+    case < 20
+      say "Lamp is dim — press A to brighten"
+    case 20 to 70
+      say "Lamp is comfortable"
+    case > 70
+      say "Lamp is bright"
+  end
+end

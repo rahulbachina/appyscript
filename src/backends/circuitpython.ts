@@ -1,195 +1,103 @@
-// AppyScript → CircuitPython (Adafruit boards — Circuit Playground, CLUE, PyBadge)
-// CircuitPython uses `import board`, `import time`, `import digitalio` etc.
-// No asyncio — simple polling loop like micro:bit.
+// AppyScript → CircuitPython (Adafruit Circuit Playground Bluefruit) — v5
 
 import type { Program, Block, Statement, Trigger, SensorName, FaceExpression } from '../ast'
-import { BaseCodegen, MICROBIT_IMAGES } from '../codegen/base'
+import { BaseCodegen } from '../codegen/base'
 import type { HardwareProfile, GenerateResult } from '../plugins'
 
-const CP_SENSORS: Record<SensorName, string> = {
-  distance:     '0',                                 // needs external HC-SR04
-  light:        'cp.light',                          // Circuit Playground built-in
-  temperature:  'cp.temperature',
-  touch:        'cp.touch_A1',                       // capacitive touch pad
-  acceleration: 'abs(cp.acceleration[2])',           // Z-axis
+const S: Record<SensorName,string> = {
+  distance:'0', light:'cp.light', temperature:'cp.temperature',
+  touch:'cp.touch_A1', acceleration:'abs(cp.acceleration[2])',
+}
+const PIXELS: Record<FaceExpression,string> = {
+  happy:'(0,255,0)', sad:'(0,0,255)', thinking:'(128,0,128)', excited:'(255,165,0)',
+  angry:'(255,0,0)', alert:'(255,255,0)', sleep:'(0,0,16)', calm:'(0,128,128)',
+  confused:'(255,20,147)', dizzy:'(255,255,255)',
 }
 
-// Circuit Playground Bluefruit pixel colours for expressions
-const CP_PIXELS: Record<FaceExpression, string> = {
-  happy:    '(0, 255, 0)',     // green
-  sad:      '(0, 0, 255)',     // blue
-  thinking: '(128, 0, 128)',  // purple
-  excited:  '(255, 165, 0)',  // orange
-  angry:    '(255, 0, 0)',     // red
-  alert:    '(255, 255, 0)',   // yellow
-  sleep:    '(0, 0, 16)',      // dim blue
-  calm:     '(0, 128, 128)',   // teal
-  confused: '(255, 20, 147)', // deep pink
-  dizzy:    '(255, 255, 255)', // white
-}
-
-class CircuitPythonCodegen extends BaseCodegen {
-  protected sensorCall(sensor: SensorName): string {
-    return CP_SENSORS[sensor] ?? '0'
-  }
+class Gen extends BaseCodegen {
+  protected sensorCall(s: SensorName) { return S[s] }
 
   generate(program: Program, profile: HardwareProfile): GenerateResult {
-    this.lines = []; this.indentLevel = 0; this.definedFunctions.clear()
-
+    this.lines=[]; this.indentLevel=0; this.definedFunctions.clear()
     this.emitHeader(profile.name, profile.runtime)
-    this.emit('import time')
-    this.emit('import board')
-    this.emit('import digitalio')
-    this.emit('from adafruit_circuitplayground import cp')
-    this.emitBlank()
-    this.emit('# AppyScript robot interface for Circuit Playground')
+    this.emit('import time, random'); this.emit('from adafruit_circuitplayground import cp')
     this.emitBlank()
 
-    const defines      = program.blocks.filter(b => b.kind === 'define')
-    const whenBlocks   = program.blocks.filter(b => b.kind === 'when')
-    const foreverBlocks = program.blocks.filter(b => b.kind === 'forever')
-    const startBlocks  = whenBlocks.filter(b => b.kind === 'when' && b.trigger.kind === 'start')
-    const pollBlocks   = whenBlocks.filter(b => b.kind === 'when' && b.trigger.kind !== 'start')
+    const defines  = program.blocks.filter(b=>b.kind==='define')
+    const whens    = program.blocks.filter(b=>b.kind==='when')
+    const forevers = program.blocks.filter(b=>b.kind==='forever')
+    const starts   = whens.filter(b=>b.kind==='when'&&b.trigger.kind==='start')
+    const polls    = whens.filter(b=>b.kind==='when'&&b.trigger.kind!=='start')
 
-    for (const block of defines) {
-      if (block.kind !== 'define') continue
-      this.definedFunctions.add(block.name)
-      this.emit(`def ${block.name}():`, block.loc?.line)
-      this.indent()
-      this.emitStatements(block.body)
-      this.dedent()
-      this.emitBlank()
+    for (const b of defines) {
+      if (b.kind!=='define') continue
+      this.definedFunctions.add(b.name)
+      this.emit(`def ${b.name}():`,b.loc?.line); this.indent(); this.stmts(b.body); this.dedent(); this.emitBlank()
     }
-
-    for (const b of startBlocks) {
-      if (b.kind === 'when') this.emitStatements(b.body)
-    }
-
-    if (pollBlocks.length > 0 || foreverBlocks.length > 0) {
-      this.emit('while True:')
-      this.indent()
-
-      for (const block of pollBlocks) {
-        if (block.kind !== 'when') continue
-        const cond = this.triggerCondition(block.trigger)
-        if (!cond) continue
-        this.emit(`if ${cond}:`, block.loc?.line)
-        this.indent()
-        this.emitStatements(block.body)
-        this.dedent()
+    for (const b of starts) if (b.kind==='when') this.stmts(b.body)
+    if (polls.length>0||forevers.length>0) {
+      this.emit('while True:'); this.indent()
+      for (const b of polls) {
+        if (b.kind!=='when') continue
+        const cond=this.tcond(b.trigger); if (!cond) continue
+        this.emit(`if ${cond}:`,b.loc?.line); this.indent(); this.stmts(b.body); this.dedent()
       }
-
-      for (const block of foreverBlocks) {
-        if (block.kind !== 'forever') continue
-        this.emitStatements(block.body)
-      }
-
-      this.emit('time.sleep(0.05)')
-      this.dedent()
+      for (const b of forevers) if (b.kind==='forever') this.stmts(b.body)
+      this.emit('time.sleep(0.05)'); this.dedent()
     }
-
     return this.result()
   }
 
-  private triggerCondition(trigger: Trigger): string | null {
-    switch (trigger.kind) {
-      case 'button_a':  return 'cp.button_a'
-      case 'button_b':  return 'cp.button_b'
-      case 'shaken':    return 'cp.shake(shake_threshold=20)'
-      case 'tilted':    return 'abs(cp.acceleration[0]) > 5'
-      case 'received':  return 'False  # radio requires BLE setup'
-      case 'sensor':
-        return `${this.sensorCall(trigger.sensor)} ${trigger.op} ${trigger.threshold}`
+  private tcond(t: Trigger): string|null {
+    switch(t.kind) {
+      case 'button_a': return 'cp.button_a'; case 'button_b': return 'cp.button_b'
+      case 'shaken':   return 'cp.shake(shake_threshold=20)'
+      case 'tilted':   return 'abs(cp.acceleration[0]) > 5'
+      case 'sensor':   return `${this.sensorCall(t.sensor)} ${t.op} ${t.threshold}`
       default: return null
     }
   }
 
-  private emitStatements(stmts: Statement[]) {
-    if (stmts.length === 0) { this.emit('pass'); return }
-    for (const stmt of stmts) this.emitStatement(stmt)
+  private stmts(ss: Statement[]) {
+    if (ss.length===0) { this.emit('pass'); return }
+    for (const s of ss) this.stmt(s)
   }
 
-  private emitStatement(stmt: Statement) {
-    const loc = stmt.loc?.line
-    switch (stmt.kind) {
-      case 'move':
-        // Circuit Playground has no motors built-in; assume DC motors via PWM
-        this.emit(`# move ${stmt.direction} at ${stmt.speed ?? 50}%`, loc)
-        this.emit(`# Connect motors to A1/A2 with a motor driver`)
-        break
-      case 'turn':
-        this.emit(`# turn ${stmt.direction} ${stmt.degrees}°`, loc)
-        break
-      case 'stop':
-        this.emit('# stop motors', loc)
-        break
-      case 'say':
-        // Circuit Playground: print to serial + beep
-        this.emit(`print(${JSON.stringify(stmt.text)})`, loc)
-        this.emit('cp.play_tone(440, 0.2)')
-        break
-      case 'play':
-        this.emit(`# play "${stmt.sound}"`, loc)
-        this.emit('cp.play_tone(440, 0.5)')
-        break
-      case 'show': {
-        const colour = CP_PIXELS[stmt.expression] ?? '(0, 255, 0)'
-        this.emit(`cp.pixels.fill(${colour})   # ${stmt.expression}`, loc)
-        break
-      }
-      case 'show_text':
-        this.emit(`print(${JSON.stringify(stmt.text)})`, loc)
-        break
-      case 'show_number':
-        this.emit(`print(${this.emitValue(stmt.value)})`, loc)
-        break
-      case 'wait':
-        this.emit(`time.sleep(${this.durationMs(stmt.duration) / 1000})`, loc)
-        break
-      case 'let':
-        this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
-        break
-      case 'set':
-        this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
-        break
-      case 'remember':
-        this.emit(`# remember — use storage module for persistence`, loc)
-        this.emit(`# import storage; storage.getmount("/").readonly = False`)
-        break
-      case 'send':
-        this.emit(`# send — BLE radio not yet configured`, loc)
-        break
-      case 'do':
-        this.emit(this.definedFunctions.has(stmt.name) ? `${stmt.name}()` : `# Warning: '${stmt.name}' not defined`, loc)
-        break
+  private stmt(s: Statement) {
+    const l=s.loc?.line
+    switch(s.kind) {
+      case 'move':       this.emit(`# move ${s.direction} at ${s.speed??50}% — connect motor driver`,l); break
+      case 'turn':       this.emit(`# turn ${s.direction} ${s.degrees}°`,l); break
+      case 'stop':       this.emit('# stop motors',l); break
+      case 'stop_all':   this.emit('cp.pixels.fill((0,0,0))',l); this.emit('# stop all motors'); break
+      case 'say':        this.emit(`print(${this.emitStr(s.text)})`,l); this.emit('cp.play_tone(440, 0.2)'); break
+      case 'play':       this.emit(`cp.play_tone(440, 0.5)   # play "${s.sound}"`,l); break
+      case 'show':       this.emit(`cp.pixels.fill(${PIXELS[s.expression]??'(0,255,0)'})   # ${s.expression}`,l); break
+      case 'show_text':  this.emit(`print(${this.emitStr(s.text)})`,l); break
+      case 'show_number':this.emit(`print(${this.emitValue(s.value)})`,l); break
+      case 'wait':       this.emit(`time.sleep(${this.durationMs(s.duration)/1000})`,l); break
+      case 'wait_until': this.emitWaitUntilSync(s.condition, l); break
+      case 'let':        this.emit(`${s.name} = ${this.emitValue(s.value)}`,l); break
+      case 'set':        this.emit(`${s.name} = ${this.emitValue(s.value)}`,l); break
+      case 'remember':   this.emit(`# remember — use storage module`,l); break
+      case 'save':       this.emit(`# save ${s.name} — use storage module`,l); break
+      case 'load':       this.emit(`# load ${s.name} — use storage module`,l); break
+      case 'list_add':   this.emit(`${s.list}.append(${this.emitValue(s.value)})`,l); break
+      case 'do':         this.emit(this.definedFunctions.has(s.name)?`${s.name}()`:`# '${s.name}' not defined`,l); break
+      case 'send':       this.emit(`# radio.send(${this.emitValue(s.message)}) — configure BLE`,l); break
       case 'if':
-        this.emit(`if ${this.emitCondition(stmt.condition)}:`, loc)
-        this.indent(); this.emitStatements(stmt.then); this.dedent()
-        if (stmt.else) {
-          this.emit('else:')
-          this.indent(); this.emitStatements(stmt.else); this.dedent()
-        }
-        break
+        this.emit(`if ${this.emitCond(s.condition)}:`,l); this.indent(); this.stmts(s.then); this.dedent()
+        if (s.else) { this.emit('else:'); this.indent(); this.stmts(s.else); this.dedent() }; break
       case 'repeat':
-        this.emit(`for _i in range(${this.emitValue(stmt.count)}):`, loc)
-        this.indent(); this.emitStatements(stmt.body); this.dedent()
-        break
+        this.emit(`for _i in range(${this.emitValue(s.count)}):`,l); this.indent(); this.stmts(s.body); this.dedent(); break
       case 'while':
-        this.emit(`while ${this.emitCondition(stmt.condition)}:`, loc)
-        this.indent()
-        this.emitStatements(stmt.body)
-        this.emit('time.sleep(0.01)')
-        this.dedent()
-        break
+        this.emit(`while ${this.emitCond(s.condition)}:`,l); this.indent()
+        this.stmts(s.body); this.emit('time.sleep(0.01)'); this.dedent(); break
     }
   }
 }
 
 export const circuitpythonBackend = {
-  targetId: 'circuitpython',
-  name: 'CircuitPython (Adafruit) Backend',
-  version: '1.0.0',
-  generate(program: Program, profile: HardwareProfile): GenerateResult {
-    return new CircuitPythonCodegen().generate(program, profile)
-  },
+  targetId:'circuitpython', name:'CircuitPython (Adafruit) Backend', version:'5.0.0',
+  generate(p: Program, prof: HardwareProfile): GenerateResult { return new Gen().generate(p,prof) },
 }

@@ -150,3 +150,10 @@ const circuitPlaygroundProfile: HardwareProfile = {
 }
 
 HARDWARE_PROFILES['circuitpython'] = circuitPlaygroundProfile
+
+HARDWARE_PROFILES['home'] = {
+  id: 'home', name: 'Applaa Home Automation', runtime: 'CircuitPython' as any,
+  description: 'Compiles AppyScript to Applaa Builder JSON device commands and automations.',
+  sensors: { distance: false, light: true, temperature: true, touch: false, acceleration: false },
+  memory: { flashKB: 0, ramKB: 0 }, supportsAsync: false, hasDisplay: false, hasRadio: false,
+}
