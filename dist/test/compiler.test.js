@@ -422,4 +422,91 @@ end`;
         strict_1.default.ok(entry === undefined || entry.sourceLine > 0);
     });
 });
+// ── CircuitPython backend tests ───────────────────────────────────────────────
+(0, node_test_1.describe)('Compiler — CircuitPython', () => {
+    (0, node_test_1.it)('compiles to CircuitPython for Adafruit', () => {
+        const src = `
+when button_a pressed
+  show happy
+  play "tada"
+end
+
+forever
+  if light < 30%
+    show sleep
+  end
+  wait 100ms
+end`;
+        const result = (0, index_1.compile)(src, 'circuitpython');
+        strict_1.default.ok(result.ok, `Should compile. Errors: ${result.errors.map(e => e.message).join(', ')}`);
+        strict_1.default.ok(result.code.includes('from adafruit_circuitplayground import cp'));
+        strict_1.default.ok(result.code.includes('cp.button_a'));
+        strict_1.default.ok(result.code.includes('cp.pixels.fill')); // show happy → NeoPixel colour
+        strict_1.default.ok(result.code.includes('time.sleep(0.05)')); // forever wait
+    });
+    (0, node_test_1.it)('hardware profile shows no distance sensor warning', () => {
+        const src = `
+when distance < 30cm
+  stop
+end`;
+        const result = (0, index_1.compile)(src, 'circuitpython');
+        // distance sensor not available on Circuit Playground — should error
+        strict_1.default.ok(!result.ok || result.errors.some(e => e.code === 'E023'));
+    });
+    (0, node_test_1.it)('uses NeoPixel colours for expressions', () => {
+        const expressions = ['happy', 'sad', 'angry', 'calm', 'excited'];
+        for (const expr of expressions) {
+            const src = `when button_a pressed\n  show ${expr}\nend`;
+            const result = (0, index_1.compile)(src, 'circuitpython');
+            strict_1.default.ok(result.ok);
+            strict_1.default.ok(result.code.includes('cp.pixels.fill'), `${expr} should use NeoPixel`);
+        }
+    });
+});
+// ── Hardware profile tests ────────────────────────────────────────────────────
+(0, node_test_1.describe)('Hardware profiles', () => {
+    (0, node_test_1.it)('microbit lacks distance sensor', () => {
+        const { HARDWARE_PROFILES } = require('../plugins');
+        strict_1.default.ok(!HARDWARE_PROFILES.microbit.sensors.distance);
+    });
+    (0, node_test_1.it)('esp32 has all sensors', () => {
+        const { HARDWARE_PROFILES } = require('../plugins');
+        const sensors = HARDWARE_PROFILES.esp32.sensors;
+        strict_1.default.ok(sensors.distance && sensors.light && sensors.temperature && sensors.touch && sensors.acceleration);
+    });
+    (0, node_test_1.it)('pico lacks built-in acceleration', () => {
+        const { HARDWARE_PROFILES } = require('../plugins');
+        strict_1.default.ok(!HARDWARE_PROFILES.pico.sensors.acceleration);
+    });
+    (0, node_test_1.it)('circuitpython profile registered', () => {
+        const { HARDWARE_PROFILES } = require('../plugins');
+        strict_1.default.ok(HARDWARE_PROFILES.circuitpython);
+        strict_1.default.equal(HARDWARE_PROFILES.circuitpython.runtime, 'CircuitPython');
+    });
+});
+// ── MCP-style workflow test ───────────────────────────────────────────────────
+(0, node_test_1.describe)('MCP workflow', () => {
+    (0, node_test_1.it)('validate → compile → simulate pipeline', () => {
+        const source = `
+when button_a pressed
+  say "Hello!"
+  show happy
+  move forward at 50% for 1s
+end`;
+        // Step 1: validate
+        const { valid, errors } = (0, index_1.validate)(source);
+        strict_1.default.ok(valid, `Validation failed: ${errors.map(e => e.message).join(', ')}`);
+        // Step 2: compile for esp32
+        const compiled = (0, index_1.compile)(source, 'esp32');
+        strict_1.default.ok(compiled.ok);
+        strict_1.default.ok(compiled.code.includes('asyncio'));
+        // Step 3: simulate
+        const ast = (0, parser_1.parse)((0, lexer_1.tokenize)(source));
+        const simResult = new simulator_1.Simulator({ buttons: { a: true }, maxTicks: 1 }).run(ast);
+        strict_1.default.ok(simResult.success);
+        strict_1.default.ok(simResult.events.some(e => e.type === 'say'));
+        strict_1.default.ok(simResult.events.some(e => e.type === 'show'));
+        strict_1.default.ok(simResult.events.some(e => e.type === 'move'));
+    });
+});
 //# sourceMappingURL=compiler.test.js.map

@@ -461,3 +461,24 @@ export class Parser {
 export function parse(tokens: Token[]): Program {
   return new Parser(tokens).parse()
 }
+
+// ── Match/Case parsing (exported helper, desugars to if-else chain) ───────────
+// Used by tools that want to translate match blocks without modifying the core parser.
+// Syntax:
+//   match distance
+//     case < 30cm   → body
+//     case 30 to 60 → body  (range, desugars to: subject >= 30 and subject <= 60)
+//     else          → body
+//   end
+
+export interface ParsedMatchCase {
+  conditionStr: string
+  body: Statement[]
+}
+
+export function parseMatchBlock(source: string): { subject: string; cases: ParsedMatchCase[]; elseBody?: Statement[] } | null {
+  // Lightweight regex-based pre-processor — not full AST
+  // Returns null if source doesn't contain a match block
+  if (!/\bmatch\b/i.test(source)) return null
+  return null // Full implementation in a future release
+}

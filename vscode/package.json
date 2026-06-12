@@ -1,0 +1,35 @@
+{
+  "name": "appyscript-language",
+  "displayName": "AppyScript",
+  "description": "Language support for AppyScript — the English-first language for educational robotics",
+  "version": "2.0.0",
+  "publisher": "applaa",
+  "icon": "icon.png",
+  "categories": ["Programming Languages"],
+  "repository": { "type": "git", "url": "https://github.com/rahulbachina/appyscript" },
+  "engines": { "vscode": "^1.80.0" },
+  "contributes": {
+    "languages": [
+      {
+        "id": "appyscript",
+        "aliases": ["AppyScript", "appyscript"],
+        "extensions": [".appy"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark":  "./icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "appyscript",
+        "scopeName": "source.appyscript",
+        "path": "./appyscript.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      { "language": "appyscript", "path": "./snippets.json" }
+    ]
+  }
+}

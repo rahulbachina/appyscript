@@ -89,3 +89,40 @@ export interface Program {
   blocks: Block[]
   source?: string   // original source, for diagnostics
 }
+
+// ── Pattern matching (v2 extension) ──────────────────────────────────────────
+// Syntax:
+//   match distance
+//     case < 10cm
+//       show angry
+//     case 10 to 50cm
+//       show alert
+//     case > 50cm
+//       show calm
+//   end
+
+export interface MatchCase {
+  // Either a simple comparison...
+  op?: CompareOp
+  threshold?: number
+  unit?: string
+  // ...or a range
+  rangeFrom?: number
+  rangeTo?: number
+  rangeUnit?: string
+  // The body
+  body: Statement[]
+}
+
+// Add to Statement union:
+// | { kind: 'match'; subject: Value; cases: MatchCase[]; else?: Statement[] }
+// We add it via the StatementNode extension below.
+// (TypeScript unions can be extended by updating the StatementNode type above,
+// but since we're adding post-factum, we export a standalone type for codegen.)
+export type MatchStatement = {
+  kind: 'match'
+  subject: Value
+  cases: MatchCase[]
+  else?: Statement[]
+  loc?: SourceLocation
+}

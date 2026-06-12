@@ -164,3 +164,19 @@ export interface Program {
     blocks: Block[];
     source?: string;
 }
+export interface MatchCase {
+    op?: CompareOp;
+    threshold?: number;
+    unit?: string;
+    rangeFrom?: number;
+    rangeTo?: number;
+    rangeUnit?: string;
+    body: Statement[];
+}
+export type MatchStatement = {
+    kind: 'match';
+    subject: Value;
+    cases: MatchCase[];
+    else?: Statement[];
+    loc?: SourceLocation;
+};

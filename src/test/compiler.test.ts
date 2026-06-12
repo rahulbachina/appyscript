@@ -472,3 +472,104 @@ describe('Source maps', () => {
     assert.ok(entry === undefined || entry.sourceLine > 0)
   })
 })
+
+// ── CircuitPython backend tests ───────────────────────────────────────────────
+
+describe('Compiler — CircuitPython', () => {
+  it('compiles to CircuitPython for Adafruit', () => {
+    const src = `
+when button_a pressed
+  show happy
+  play "tada"
+end
+
+forever
+  if light < 30%
+    show sleep
+  end
+  wait 100ms
+end`
+    const result = compile(src, 'circuitpython')
+    assert.ok(result.ok, `Should compile. Errors: ${result.errors.map(e => e.message).join(', ')}`)
+    assert.ok(result.code!.includes('from adafruit_circuitplayground import cp'))
+    assert.ok(result.code!.includes('cp.button_a'))
+    assert.ok(result.code!.includes('cp.pixels.fill'))   // show happy → NeoPixel colour
+    assert.ok(result.code!.includes('time.sleep(0.05)')) // forever wait
+  })
+
+  it('hardware profile shows no distance sensor warning', () => {
+    const src = `
+when distance < 30cm
+  stop
+end`
+    const result = compile(src, 'circuitpython')
+    // distance sensor not available on Circuit Playground — should error
+    assert.ok(!result.ok || result.errors.some(e => e.code === 'E023'))
+  })
+
+  it('uses NeoPixel colours for expressions', () => {
+    const expressions = ['happy', 'sad', 'angry', 'calm', 'excited'] as const
+    for (const expr of expressions) {
+      const src = `when button_a pressed\n  show ${expr}\nend`
+      const result = compile(src, 'circuitpython')
+      assert.ok(result.ok)
+      assert.ok(result.code!.includes('cp.pixels.fill'), `${expr} should use NeoPixel`)
+    }
+  })
+})
+
+// ── Hardware profile tests ────────────────────────────────────────────────────
+
+describe('Hardware profiles', () => {
+  it('microbit lacks distance sensor', () => {
+    const { HARDWARE_PROFILES } = require('../plugins')
+    assert.ok(!HARDWARE_PROFILES.microbit.sensors.distance)
+  })
+
+  it('esp32 has all sensors', () => {
+    const { HARDWARE_PROFILES } = require('../plugins')
+    const sensors = HARDWARE_PROFILES.esp32.sensors
+    assert.ok(sensors.distance && sensors.light && sensors.temperature && sensors.touch && sensors.acceleration)
+  })
+
+  it('pico lacks built-in acceleration', () => {
+    const { HARDWARE_PROFILES } = require('../plugins')
+    assert.ok(!HARDWARE_PROFILES.pico.sensors.acceleration)
+  })
+
+  it('circuitpython profile registered', () => {
+    const { HARDWARE_PROFILES } = require('../plugins')
+    assert.ok(HARDWARE_PROFILES.circuitpython)
+    assert.equal(HARDWARE_PROFILES.circuitpython.runtime, 'CircuitPython')
+  })
+})
+
+// ── MCP-style workflow test ───────────────────────────────────────────────────
+
+describe('MCP workflow', () => {
+  it('validate → compile → simulate pipeline', () => {
+    const source = `
+when button_a pressed
+  say "Hello!"
+  show happy
+  move forward at 50% for 1s
+end`
+
+    // Step 1: validate
+    const { valid, errors } = validate(source)
+    assert.ok(valid, `Validation failed: ${errors.map(e => e.message).join(', ')}`)
+
+    // Step 2: compile for esp32
+    const compiled = compile(source, 'esp32')
+    assert.ok(compiled.ok)
+    assert.ok(compiled.code!.includes('asyncio'))
+
+    // Step 3: simulate
+    const ast = parse(tokenize(source))
+    const simResult = new Simulator({ buttons: { a: true }, maxTicks: 1 }).run(ast)
+    assert.ok(simResult.success)
+    assert.ok(simResult.events.some(e => e.type === 'say'))
+    assert.ok(simResult.events.some(e => e.type === 'show'))
+    assert.ok(simResult.events.some(e => e.type === 'move'))
+  })
+})

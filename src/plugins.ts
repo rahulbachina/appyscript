@@ -134,3 +134,19 @@ class PluginRegistry {
 }
 
 export const registry = new PluginRegistry()
+
+// ── CircuitPython / Adafruit hardware profiles ────────────────────────────────
+
+const circuitPlaygroundProfile: HardwareProfile = {
+  id: 'circuitpython',
+  name: 'Adafruit Circuit Playground Bluefruit',
+  runtime: 'CircuitPython',
+  description: 'Circuit Playground Bluefruit. Built-in: 10 NeoPixels, speaker, mic, light sensor, accel, temp, touch pads, BLE.',
+  sensors: { distance: false, light: true, temperature: true, touch: true, acceleration: true },
+  memory: { flashKB: 1024, ramKB: 256 },
+  supportsAsync: false,
+  hasDisplay: false,
+  hasRadio: true,
+}
+
+HARDWARE_PROFILES['circuitpython'] = circuitPlaygroundProfile

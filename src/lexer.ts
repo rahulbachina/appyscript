@@ -23,7 +23,7 @@ export type TokenKind =
   | 'IF' | 'ELSE' | 'REPEAT' | 'TIMES' | 'WHILE' | 'UNTIL'
   | 'AND' | 'OR' | 'NOT'
   | 'LET' | 'SET' | 'TO' | 'REMEMBER' | 'CHANGE' | 'BY'
-  | 'THEN' | 'OTHERWISE'
+  | 'THEN' | 'OTHERWISE' | 'MATCH' | 'CASE' | 'DEFAULT'
   // Actions
   | 'MOVE' | 'TURN' | 'SPIN' | 'STOP' | 'SAY' | 'PLAY' | 'SHOW' | 'WAIT' | 'SEND' | 'BACK'
   // Direction keywords
@@ -52,7 +52,7 @@ export interface Token {
 
 const KEYWORDS: Record<string, TokenKind> = {
   when: 'WHEN', on: 'ON', forever: 'FOREVER', define: 'DEFINE', do: 'DO', end: 'END',
-  if: 'IF', else: 'ELSE', then: 'THEN', otherwise: 'OTHERWISE',
+  if: 'IF', else: 'ELSE', then: 'THEN', otherwise: 'OTHERWISE', match: 'MATCH', case: 'CASE', default: 'DEFAULT',
   repeat: 'REPEAT', times: 'TIMES', while: 'WHILE', until: 'UNTIL',
   and: 'AND', or: 'OR', not: 'NOT',
   let: 'LET', set: 'SET', to: 'TO', remember: 'REMEMBER', change: 'CHANGE', by: 'BY',

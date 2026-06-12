@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 "use strict";
-// AppyScript MCP Server
-// Any AI agent (Claude, GPT, Gemini) can use this to generate + compile AppyScript.
+// AppyScript MCP Server — v2
+// Any AI agent (Claude, GPT, Gemini) can use this to generate, compile,
+// validate, explain, and simulate AppyScript programs.
 //
-// Start: node dist/mcp/server.js
-// In Claude Desktop: add to claude_desktop_config.json
+// Start:   node dist/mcp/server.js
+// Claude Desktop: add to claude_desktop_config.json
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_js_1 = require("@modelcontextprotocol/sdk/server/index.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
 const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
 const compiler_1 = require("../compiler");
-const server = new index_js_1.Server({ name: 'appyscript', version: '0.1.0' }, { capabilities: { tools: {} } });
+const lexer_1 = require("../lexer");
+const parser_1 = require("../parser");
+const simulator_1 = require("../simulation/simulator");
+const plugins_1 = require("../plugins");
+const server = new index_js_1.Server({ name: 'appyscript', version: '2.0.0' }, { capabilities: { tools: {} } });
 // ── Tool definitions ──────────────────────────────────────────────────────────
 server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
     tools: [
@@ -18,20 +23,22 @@ server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
             name: 'appyscript_compile',
             description: [
                 'Compile AppyScript source code to hardware-ready code for a specific robot chip.',
-                'Returns the compiled code (MicroPython or Arduino C++) ready to flash to the device.',
-                'Use this to validate your AppyScript output before presenting it to the student.',
+                'Returns MicroPython (ESP32, Pico, micro:bit) or Arduino C++ ready to flash.',
+                'Also returns structured diagnostics — errors AND warnings — so you can fix issues before presenting to the student.',
+                'Use appyscript_validate first to check syntax, then appyscript_compile to generate code.',
             ].join(' '),
             inputSchema: {
                 type: 'object',
                 properties: {
-                    source: {
-                        type: 'string',
-                        description: 'AppyScript source code to compile',
-                    },
+                    source: { type: 'string', description: 'AppyScript source code to compile' },
                     target: {
                         type: 'string',
                         enum: ['esp32', 'arduino', 'pico', 'microbit'],
                         description: 'Target hardware platform',
+                    },
+                    strict: {
+                        type: 'boolean',
+                        description: 'Treat warnings as errors (default false)',
                     },
                 },
                 required: ['source', 'target'],
@@ -40,14 +47,20 @@ server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
         {
             name: 'appyscript_validate',
             description: [
-                'Check if AppyScript source code is syntactically valid.',
-                'Returns a list of errors with line numbers if invalid.',
+                'Check if AppyScript source code is valid — syntax AND semantic checks.',
+                'Returns errors with line numbers and fix suggestions.',
+                'Also returns warnings (e.g. infinite loops without wait, unused behaviours).',
                 'Always validate before presenting code to a student.',
             ].join(' '),
             inputSchema: {
                 type: 'object',
                 properties: {
                     source: { type: 'string', description: 'AppyScript source code to validate' },
+                    target: {
+                        type: 'string',
+                        enum: ['esp32', 'arduino', 'pico', 'microbit'],
+                        description: 'Optional: target hardware for hardware-specific checks (e.g. sensor availability)',
+                    },
                 },
                 required: ['source'],
             },
@@ -64,6 +77,69 @@ server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
                     source: { type: 'string', description: 'AppyScript source code to explain' },
                 },
                 required: ['source'],
+            },
+        },
+        {
+            name: 'appyscript_simulate',
+            description: [
+                'Simulate an AppyScript program in JavaScript — no hardware required.',
+                'Runs the program and returns: all events the robot would emit (say, show, move, turn, etc.),',
+                'the final robot state (position, expression, variables), and an execution trace.',
+                'Use this to verify a program behaves correctly before presenting it to a student.',
+                'You can inject sensor values and button presses to test conditional logic.',
+            ].join(' '),
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    source: { type: 'string', description: 'AppyScript source code to simulate' },
+                    sensors: {
+                        type: 'object',
+                        description: 'Override sensor readings: { distance: 20, light: 80, temperature: 25 }',
+                        properties: {
+                            distance: { type: 'number' },
+                            light: { type: 'number' },
+                            temperature: { type: 'number' },
+                            touch: { type: 'number' },
+                            acceleration: { type: 'number' },
+                        },
+                    },
+                    buttons: {
+                        type: 'object',
+                        description: 'Button states: { a: true, b: false }',
+                        properties: {
+                            a: { type: 'boolean' },
+                            b: { type: 'boolean' },
+                        },
+                    },
+                    triggerEvents: {
+                        type: 'array',
+                        items: { type: 'string', enum: ['shaken', 'tilted', 'received'] },
+                        description: 'Which event triggers to fire',
+                    },
+                    maxTicks: {
+                        type: 'number',
+                        description: 'Max simulation loop iterations (default 50)',
+                    },
+                },
+                required: ['source'],
+            },
+        },
+        {
+            name: 'appyscript_hardware_info',
+            description: [
+                'Get detailed hardware capability information for a specific target.',
+                'Shows: available sensors, memory (flash/RAM), async support, display, radio.',
+                'Use this to know which sensors are available before writing sensor-based code.',
+            ].join(' '),
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    target: {
+                        type: 'string',
+                        enum: ['esp32', 'arduino', 'pico', 'microbit'],
+                    },
+                },
+                required: ['target'],
             },
         },
         {
@@ -84,90 +160,200 @@ server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
 // ── Tool handlers ─────────────────────────────────────────────────────────────
 server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    switch (name) {
-        case 'appyscript_compile': {
-            const source = args?.source;
-            const target = args?.target;
-            const result = (0, compiler_1.compile)(source, target);
-            if (result.ok && result.code) {
+    try {
+        switch (name) {
+            // ── compile ─────────────────────────────────────────────────────────────
+            case 'appyscript_compile': {
+                const source = args?.source;
+                const target = args?.target;
+                const strict = args?.strict ?? false;
+                const result = (0, compiler_1.compile)(source, target, { strict });
                 return {
-                    content: [
-                        {
+                    content: [{
                             type: 'text',
                             text: JSON.stringify({
-                                success: true,
+                                success: result.ok,
                                 target,
-                                code: result.code,
+                                code: result.code ?? null,
+                                errors: result.errors.map(d => ({
+                                    code: d.code, message: d.message,
+                                    line: d.span?.line, col: d.span?.col,
+                                    hint: d.hint, fix: d.fix?.description,
+                                })),
+                                warnings: result.warnings.map(d => ({
+                                    code: d.code, message: d.message,
+                                    line: d.span?.line, hint: d.hint,
+                                })),
+                                formatted: result.formattedDiagnostics ?? null,
                             }, null, 2),
-                        },
-                    ],
+                        }],
+                    isError: !result.ok,
                 };
             }
-            else {
+            // ── validate ─────────────────────────────────────────────────────────────
+            case 'appyscript_validate': {
+                const source = args?.source;
+                const target = args?.target ?? 'esp32';
+                const result = (0, compiler_1.compile)(source, target, { skipLint: false });
                 return {
-                    content: [
-                        {
+                    content: [{
                             type: 'text',
                             text: JSON.stringify({
-                                success: false,
-                                errors: result.errors,
+                                valid: result.ok,
+                                errors: result.errors.map(d => ({
+                                    code: d.code, message: d.message,
+                                    line: d.span?.line, col: d.span?.col,
+                                    hint: d.hint, fix: d.fix?.description,
+                                })),
+                                warnings: result.warnings.map(d => ({
+                                    code: d.code, message: d.message,
+                                    line: d.span?.line, hint: d.hint,
+                                })),
                             }, null, 2),
-                        },
-                    ],
+                        }],
                 };
             }
+            // ── explain ───────────────────────────────────────────────────────────────
+            case 'appyscript_explain': {
+                const source = args?.source;
+                const description = (0, compiler_1.explain)(source);
+                return { content: [{ type: 'text', text: description }] };
+            }
+            // ── simulate ──────────────────────────────────────────────────────────────
+            case 'appyscript_simulate': {
+                const source = args?.source;
+                // First validate
+                const valResult = (0, compiler_1.compile)(source, 'esp32', { skipLint: true });
+                if (!valResult.ok) {
+                    return {
+                        content: [{
+                                type: 'text',
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: 'Program has syntax errors — fix them before simulating',
+                                    errors: valResult.errors.map(d => ({ message: d.message, line: d.span?.line })),
+                                }, null, 2),
+                            }],
+                        isError: true,
+                    };
+                }
+                const tokens = (0, lexer_1.tokenize)(source);
+                const ast = (0, parser_1.parse)(tokens);
+                const result = (0, simulator_1.simulate)(ast, {
+                    sensors: args?.sensors ?? {},
+                    buttons: args?.buttons ?? {},
+                    triggerEvents: args?.triggerEvents ?? [],
+                    maxTicks: args?.maxTicks ?? 50,
+                });
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({
+                                success: result.success,
+                                ticks: result.ticks,
+                                error: result.error ?? null,
+                                events: result.events.map(e => ({
+                                    tick: e.tick,
+                                    type: e.type,
+                                    ...e.data,
+                                })),
+                                finalState: {
+                                    position: result.finalState.position,
+                                    expression: result.finalState.expression,
+                                    displayText: result.finalState.displayText,
+                                    variables: Object.fromEntries(result.finalState.variables),
+                                },
+                                executionTrace: result.executionTrace.slice(0, 20).map(t => ({
+                                    tick: t.tick,
+                                    block: t.blockKind,
+                                    stmt: t.statementKind,
+                                    line: t.sourceLine,
+                                })),
+                            }, null, 2),
+                        }],
+                };
+            }
+            // ── hardware_info ─────────────────────────────────────────────────────────
+            case 'appyscript_hardware_info': {
+                const target = args?.target;
+                const profile = plugins_1.HARDWARE_PROFILES[target];
+                if (!profile) {
+                    return {
+                        content: [{ type: 'text', text: `Unknown target: ${target}` }],
+                        isError: true,
+                    };
+                }
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({
+                                id: profile.id,
+                                name: profile.name,
+                                runtime: profile.runtime,
+                                description: profile.description,
+                                sensors: {
+                                    distance: { available: profile.sensors.distance, note: profile.sensors.distance ? 'HC-SR04 compatible' : 'Not built-in' },
+                                    light: { available: profile.sensors.light },
+                                    temperature: { available: profile.sensors.temperature },
+                                    touch: { available: profile.sensors.touch },
+                                    acceleration: { available: profile.sensors.acceleration, note: profile.sensors.acceleration ? 'Built-in IMU' : 'No built-in IMU' },
+                                },
+                                memory: {
+                                    flashKB: profile.memory.flashKB,
+                                    ramKB: profile.memory.ramKB,
+                                },
+                                features: {
+                                    asyncEventHandlers: profile.supportsAsync,
+                                    builtInDisplay: profile.hasDisplay,
+                                    wirelessRadio: profile.hasRadio,
+                                },
+                                agentGuidance: [
+                                    profile.sensors.distance ? null : `⚠ No distance sensor — avoid "when distance < Xcm"`,
+                                    profile.sensors.acceleration ? null : `⚠ No accelerometer — avoid "when shaken"`,
+                                    !profile.hasDisplay ? `ℹ No built-in display — show/say commands use serial output` : null,
+                                    profile.memory.ramKB < 10 ? `⚠ Very limited RAM (${profile.memory.ramKB}KB) — keep programs short` : null,
+                                ].filter(Boolean),
+                            }, null, 2),
+                        }],
+                };
+            }
+            // ── list_targets ──────────────────────────────────────────────────────────
+            case 'appyscript_list_targets': {
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify(compiler_1.TARGETS, null, 2),
+                        }],
+                };
+            }
+            // ── list_keywords ─────────────────────────────────────────────────────────
+            case 'appyscript_list_keywords': {
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({ keywords: compiler_1.KEYWORDS }, null, 2),
+                        }],
+                };
+            }
+            default:
+                return {
+                    content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+                    isError: true,
+                };
         }
-        case 'appyscript_validate': {
-            const source = args?.source;
-            const result = (0, compiler_1.validate)(source);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
-        }
-        case 'appyscript_explain': {
-            const source = args?.source;
-            const description = (0, compiler_1.explain)(source);
-            return {
-                content: [{ type: 'text', text: description }],
-            };
-        }
-        case 'appyscript_list_targets': {
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(compiler_1.TARGETS, null, 2),
-                    },
-                ],
-            };
-        }
-        case 'appyscript_list_keywords': {
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify({ keywords: compiler_1.KEYWORDS }, null, 2),
-                    },
-                ],
-            };
-        }
-        default:
-            return {
-                content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-                isError: true,
-            };
+    }
+    catch (err) {
+        return {
+            content: [{ type: 'text', text: `Internal error: ${err}` }],
+            isError: true,
+        };
     }
 });
 // ── Start ─────────────────────────────────────────────────────────────────────
 async function main() {
     const transport = new stdio_js_1.StdioServerTransport();
     await server.connect(transport);
-    console.error('AppyScript MCP server running on stdio');
+    console.error('AppyScript MCP server v2 running on stdio');
 }
 main().catch(console.error);
 //# sourceMappingURL=server.js.map

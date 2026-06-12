@@ -1,0 +1,87 @@
+{
+  "When button pressed": {
+    "prefix": "when-button",
+    "body": ["when button_a pressed", "\t$0", "end"],
+    "description": "Event handler for button A press"
+  },
+  "When sensor": {
+    "prefix": "when-sensor",
+    "body": ["when distance < ${1:30}cm", "\t$0", "end"],
+    "description": "Event handler for sensor trigger"
+  },
+  "When shaken": {
+    "prefix": "when-shaken",
+    "body": ["when shaken", "\t$0", "end"],
+    "description": "Event handler for shake gesture"
+  },
+  "Forever loop": {
+    "prefix": "forever",
+    "body": ["forever", "\t$0", "\twait 100ms", "end"],
+    "description": "Continuous loop with wait"
+  },
+  "Every N seconds": {
+    "prefix": "every",
+    "body": ["every ${1:5}s", "\t$0", "end"],
+    "description": "Repeating timer event"
+  },
+  "Define behaviour": {
+    "prefix": "define",
+    "body": ["define ${1:celebrate}", "\t$0", "end"],
+    "description": "Define a reusable behaviour"
+  },
+  "If-else": {
+    "prefix": "if",
+    "body": ["if ${1:distance < 30cm}", "\t$0", "else", "\t", "end"],
+    "description": "If-else block"
+  },
+  "Repeat N times": {
+    "prefix": "repeat",
+    "body": ["repeat ${1:3} times", "\t$0", "end"],
+    "description": "Fixed-count loop"
+  },
+  "Let variable": {
+    "prefix": "let",
+    "body": ["let ${1:score} = ${2:0}"],
+    "description": "Declare a variable"
+  },
+  "Move forward": {
+    "prefix": "move",
+    "body": ["move forward at ${1:50}% for ${2:2}s"],
+    "description": "Move with speed and duration"
+  },
+  "Guard robot": {
+    "prefix": "guard",
+    "body": [
+      "when distance < 30cm",
+      "\tsay \"INTRUDER ALERT!\"",
+      "\tshow angry",
+      "\tspin right 180°",
+      "\twait 1s",
+      "\tshow alert",
+      "end",
+      "",
+      "forever",
+      "\tif distance > 60cm",
+      "\t\tshow happy",
+      "\tend",
+      "\twait 500ms",
+      "end"
+    ],
+    "description": "Classic guard robot template"
+  },
+  "Dance robot": {
+    "prefix": "dance",
+    "body": [
+      "define celebrate",
+      "\tshow excited",
+      "\tsay \"Yay!\"",
+      "\tspin right 360°",
+      "end",
+      "",
+      "when button_a pressed",
+      "\tdo celebrate",
+      "end"
+    ],
+    "description": "Dance robot with custom behaviour"
+  }
+}

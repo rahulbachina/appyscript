@@ -12,6 +12,7 @@ import { esp32Backend }   from './backends/esp32'
 import { arduinoBackend } from './backends/arduino'
 import { microbitBackend } from './backends/microbit'
 import { picoBackend }    from './backends/pico'
+import { circuitpythonBackend } from './backends/circuitpython'
 import type { SourceMap } from './sourcemap'
 import type { Program } from './ast'
 
@@ -20,6 +21,7 @@ registry.register(esp32Backend)
 registry.register(arduinoBackend)
 registry.register(microbitBackend)
 registry.register(picoBackend)
+registry.register(circuitpythonBackend)
 
 export type Target = 'esp32' | 'arduino' | 'pico' | 'microbit' | string
 

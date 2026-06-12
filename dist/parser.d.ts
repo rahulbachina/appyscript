@@ -1,5 +1,5 @@
 import { Token } from './lexer';
-import type { Program } from './ast';
+import type { Program, Statement } from './ast';
 export declare class ParseError extends Error {
     line: number;
     col: number;
@@ -33,3 +33,12 @@ export declare class Parser {
     private eatNewline;
 }
 export declare function parse(tokens: Token[]): Program;
+export interface ParsedMatchCase {
+    conditionStr: string;
+    body: Statement[];
+}
+export declare function parseMatchBlock(source: string): {
+    subject: string;
+    cases: ParsedMatchCase[];
+    elseBody?: Statement[];
+} | null;

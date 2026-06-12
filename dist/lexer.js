@@ -7,7 +7,7 @@ exports.LexError = void 0;
 exports.tokenize = tokenize;
 const KEYWORDS = {
     when: 'WHEN', on: 'ON', forever: 'FOREVER', define: 'DEFINE', do: 'DO', end: 'END',
-    if: 'IF', else: 'ELSE', then: 'THEN', otherwise: 'OTHERWISE',
+    if: 'IF', else: 'ELSE', then: 'THEN', otherwise: 'OTHERWISE', match: 'MATCH', case: 'CASE', default: 'DEFAULT',
     repeat: 'REPEAT', times: 'TIMES', while: 'WHILE', until: 'UNTIL',
     and: 'AND', or: 'OR', not: 'NOT',
     let: 'LET', set: 'SET', to: 'TO', remember: 'REMEMBER', change: 'CHANGE', by: 'BY',

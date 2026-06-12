@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Parser = exports.ParseError = void 0;
 exports.parse = parse;
+exports.parseMatchBlock = parseMatchBlock;
 class ParseError extends Error {
     line;
     col;
@@ -499,5 +500,12 @@ class Parser {
 exports.Parser = Parser;
 function parse(tokens) {
     return new Parser(tokens).parse();
+}
+function parseMatchBlock(source) {
+    // Lightweight regex-based pre-processor — not full AST
+    // Returns null if source doesn't contain a match block
+    if (!/\bmatch\b/i.test(source))
+        return null;
+    return null; // Full implementation in a future release
 }
 //# sourceMappingURL=parser.js.map

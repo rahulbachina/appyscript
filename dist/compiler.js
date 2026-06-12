@@ -18,11 +18,13 @@ const esp32_1 = require("./backends/esp32");
 const arduino_1 = require("./backends/arduino");
 const microbit_1 = require("./backends/microbit");
 const pico_1 = require("./backends/pico");
+const circuitpython_1 = require("./backends/circuitpython");
 // Register built-in backends
 plugins_1.registry.register(esp32_1.esp32Backend);
 plugins_1.registry.register(arduino_1.arduinoBackend);
 plugins_1.registry.register(microbit_1.microbitBackend);
 plugins_1.registry.register(pico_1.picoBackend);
+plugins_1.registry.register(circuitpython_1.circuitpythonBackend);
 exports.TARGETS = Object.values(plugins_1.HARDWARE_PROFILES).map(p => ({
     id: p.id,
     name: p.name,
