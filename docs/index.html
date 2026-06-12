@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AppyScript — English-first robotics language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0c10;
+  --bg-surface: #111418;
+  --bg-card: #161b22;
+  --bg-code: #0d1117;
+  --border: rgba(255,255,255,0.08);
+  --border-bright: rgba(255,255,255,0.15);
+  --text: #e6edf3;
+  --text-muted: #7d8590;
+  --text-dim: #484f58;
+  --accent: #f97316;
+  --accent-glow: rgba(249,115,22,0.15);
+  --accent2: #3b82f6;
+  --accent2-glow: rgba(59,130,246,0.12);
+  --green: #22c55e;
+  --purple: #a855f7;
+  --teal: #14b8a6;
+  --pink: #ec4899;
+  --amber: #f59e0b;
+
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --num: #79c0ff;
+  --fn: #d2a8ff;
+  --op: #ff7b72;
+  --comment: #8b949e;
+  --unit: #ffa657;
+  --id: #e6edf3;
+
+  --font: 'Inter', system-ui, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 20px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem; height: 60px;
+  background: rgba(10,12,16,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em;
+}
+.nav-logo-mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; color: #fff;
+}
+.nav-links {
+  display: flex; gap: 2rem; list-style: none;
+  font-size: 0.875rem; color: var(--text-muted);
+}
+.nav-links a:hover { color: var(--text); }
+.nav-cta {
+  display: flex; align-items: center; gap: 10px;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: var(--radius-sm);
+  font-size: 0.875rem; font-weight: 600; font-family: var(--font);
+  cursor: pointer; border: none; transition: all 0.15s ease;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--bg-card); color: var(--text); border-color: var(--border-bright); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #ea6a0a; transform: translateY(-1px); }
+
+/* ── SECTIONS ── */
+section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+section.full-bleed { max-width: none; padding-left: 0; padding-right: 0; }
+
+.section-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 1rem;
+}
+.section-label::before {
+  content: ''; width: 16px; height: 2px; background: var(--accent); border-radius: 1px;
+}
+
+h2.section-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 800; letter-spacing: -0.03em;
+  line-height: 1.15; margin-bottom: 1.25rem;
+  color: var(--text);
+}
+
+p.section-desc {
+  font-size: 1.1rem; color: var(--text-muted);
+  max-width: 560px; line-height: 1.7;
+}
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding-top: 60px;
+  max-width: none;
+  position: relative;
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 60% 40%, rgba(249,115,22,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(59,130,246,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+.hero-inner {
+  max-width: 1100px; margin: 0 auto; padding: 0 2rem;
+  width: 100%;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4rem; align-items: center;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 100px;
+  background: rgba(249,115,22,0.1);
+  border: 1px solid rgba(249,115,22,0.3);
+  font-size: 0.8rem; font-weight: 600; color: var(--accent);
+  margin-bottom: 1.5rem;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+h1.hero-title {
+  font-size: clamp(2.5rem, 5.5vw, 4rem);
+  font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.05; margin-bottom: 1.5rem;
+}
+h1.hero-title span.accent { color: var(--accent); }
+h1.hero-title span.dim { color: var(--text-muted); }
+p.hero-desc {
+  font-size: 1.15rem; color: var(--text-muted);
+  line-height: 1.7; margin-bottom: 2rem; max-width: 480px;
+}
+.hero-actions {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+.hero-install {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 18px;
+  font-family: var(--mono); font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.hero-install code { color: var(--green); }
+.hero-install .prompt { color: var(--text-dim); }
+.hero-targets {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2.5rem;
+}
+.target-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 100px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  font-size: 0.75rem; font-weight: 500; color: var(--text-muted);
+}
+.target-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ── CODE BLOCK ── */
+.code-block {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  line-height: 1.8;
+}
+.code-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+.code-dots { display: flex; gap: 6px; }
+.code-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.code-dot.red { background: #ff5f56; }
+.code-dot.amber { background: #ffbd2e; }
+.code-dot.green { background: #27c93f; }
+.code-label {
+  font-size: 0.75rem; color: var(--text-dim); font-family: var(--mono);
+}
+.code-body { padding: 1.25rem 1.5rem; }
+.code-line { display: flex; }
+.ln {
+  min-width: 28px; color: var(--text-dim);
+  user-select: none; font-size: 0.8rem; padding-top: 1px;
+}
+
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.num { color: var(--num); }
+.fn { color: var(--fn); }
+.op { color: var(--op); }
+.cm { color: var(--comment); font-style: italic; }
+.unit { color: var(--unit); }
+.id-g { color: var(--green); }
+.id-o { color: var(--accent); }
+.id { color: var(--id); }
+
+.indent-1 { padding-left: 1.5em; }
+.indent-2 { padding-left: 3em; }
+
+/* ── HERO CODE ── */
+.hero-code {
+  position: relative;
+}
+.hero-code::before {
+  content: '';
+  position: absolute; inset: -2px;
+  border-radius: calc(var(--radius) + 2px);
+  background: linear-gradient(135deg, rgba(249,115,22,0.3), rgba(59,130,246,0.2), transparent 60%);
+  z-index: -1;
+}
+.hero-code-badge {
+  position: absolute; top: -12px; right: 20px;
+  background: var(--accent); color: #fff;
+  font-size: 0.7rem; font-weight: 700; padding: 3px 10px;
+  border-radius: 100px; letter-spacing: 0.05em;
+}
+
+/* ── TARGETS ── */
+#targets { position: relative; }
+.targets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px; margin-top: 3rem;
+}
+.target-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+  transition: all 0.2s ease;
+  position: relative; overflow: hidden;
+}
+.target-card::before {
+  content: '';
+  position: absolute; inset: 0; opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.target-card:hover { border-color: var(--border-bright); transform: translateY(-2px); }
+.target-card:hover::before { opacity: 1; }
+.target-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+  font-size: 1.5rem;
+}
+.target-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.target-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+.tc-esp32 .target-icon { background: rgba(59,130,246,0.15); }
+.tc-arduino .target-icon { background: rgba(20,184,166,0.15); }
+.tc-pico .target-icon { background: rgba(168,85,247,0.15); }
+.tc-microbit .target-icon { background: rgba(236,72,153,0.15); }
+.tc-circuit .target-icon { background: rgba(245,158,11,0.15); }
+.tc-home .target-icon { background: rgba(249,115,22,0.15); border: 1px solid rgba(249,115,22,0.3); }
+.tc-home { border-color: rgba(249,115,22,0.25); }
+.tc-home .target-name { color: var(--accent); }
+.tc-home::before { background: radial-gradient(ellipse at 50% 120%, rgba(249,115,22,0.07), transparent 70%); }
+.new-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--accent); color: #fff;
+  font-size: 0.6rem; font-weight: 700; padding: 2px 7px;
+  border-radius: 100px; letter-spacing: 0.06em;
+}
+
+/* ── HOME SECTION ── */
+#home-showcase {
+  padding: 5rem 2rem;
+  background: linear-gradient(to bottom, var(--bg), #0c0f14, var(--bg));
+  max-width: none;
+}
+.home-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4rem; align-items: center;
+}
+.home-visual {
+  position: relative;
+}
+.house-diagram {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 2rem;
+  position: relative; overflow: hidden;
+}
+.house-diagram::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--purple), var(--accent2));
+}
+.room-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-top: 1rem;
+}
+.room {
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px;
+  font-size: 0.78rem;
+}
+.room-name { font-weight: 600; margin-bottom: 4px; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.room-state {
+  display: flex; align-items: center; gap: 6px; font-size: 0.82rem;
+}
+.room-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.room.active { border-color: rgba(249,115,22,0.3); background: rgba(249,115,22,0.05); }
+.room.active .room-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.room.idle .room-dot { background: var(--text-dim); }
+.home-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.25);
+  color: var(--accent); font-size: 0.78rem; font-weight: 600;
+  padding: 5px 12px; border-radius: 100px; margin-bottom: 1rem;
+}
+
+/* ── HOW IT WORKS ── */
+.steps {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0; margin-top: 3rem; position: relative;
+}
+.steps::before {
+  content: '';
+  position: absolute; top: 28px; left: calc(50%/3 + 16%); right: calc(50%/3 + 16%);
+  height: 1px; background: var(--border);
+}
+.step {
+  text-align: center; padding: 1.5rem 1rem;
+  position: relative;
+}
+.step-num {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--bg-card); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-size: 1.3rem;
+  font-weight: 800; color: var(--accent);
+  font-family: var(--mono);
+}
+.step h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+.step p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+.step-arrow {
+  position: absolute; right: -10px; top: 26px;
+  color: var(--text-dim); font-size: 1.2rem; z-index: 1;
+}
+
+/* ── MCP SECTION ── */
+#mcp { background: none; }
+.mcp-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4rem; align-items: center; margin-top: 2rem;
+}
+.ai-agents {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 1.5rem 0;
+}
+.agent-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 100px; padding: 8px 16px;
+  font-size: 0.85rem; font-weight: 600;
+  transition: all 0.15s;
+}
+.agent-pill:hover { border-color: var(--border-bright); }
+.agent-dot { width: 8px; height: 8px; border-radius: 50%; }
+.agent-claude .agent-dot { background: var(--accent); }
+.agent-cursor .agent-dot { background: var(--accent2); }
+.agent-codex .agent-dot { background: var(--green); }
+.agent-gpt .agent-dot { background: var(--purple); }
+.agent-appy .agent-dot { background: var(--pink); }
+
+/* ── INSTALL ── */
+#install {
+  text-align: center;
+}
+.install-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 3rem 2rem;
+  max-width: 640px; margin: 2rem auto 0;
+  position: relative; overflow: hidden;
+}
+.install-box::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(249,115,22,0.08), transparent 60%);
+  pointer-events: none;
+}
+.install-cmd {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px 24px;
+  font-family: var(--mono); font-size: 1rem; margin: 1.5rem 0;
+}
+.install-cmd .prompt { color: var(--text-dim); }
+.install-cmd code { color: var(--green); letter-spacing: 0.01em; }
+.copy-btn {
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 6px;
+  padding: 6px 12px; font-size: 0.78rem; cursor: pointer;
+  font-family: var(--font); transition: all 0.15s;
+}
+.copy-btn:hover { border-color: var(--border-bright); color: var(--text); }
+.install-links {
+  display: flex; justify-content: center; gap: 1.5rem;
+  font-size: 0.875rem; color: var(--text-muted);
+}
+.install-links a {
+  display: flex; align-items: center; gap: 6px;
+  transition: color 0.15s;
+}
+.install-links a:hover { color: var(--accent); }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 2.5rem 2rem;
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.footer-logo {
+  display: flex; align-items: center; gap: 8px; font-weight: 700;
+  color: var(--text);
+}
+.footer-links { display: flex; gap: 1.5rem; }
+.footer-links a:hover { color: var(--text); }
+
+/* ── DIVIDER ── */
+.section-divider {
+  border: none; border-top: 1px solid var(--border);
+  margin: 0 2rem;
+}
+
+/* ── INLINE SVG ICONS ── */
+.icon-chip { font-size: 1.4rem; line-height: 1; }
+
+/* ── QUOTE / CALLOUT ── */
+.callout {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: rgba(249,115,22,0.06); border: 1px solid rgba(249,115,22,0.2);
+  border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+}
+.callout-icon { font-size: 1.5rem; flex-shrink: 0; }
+.callout-text { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+.callout-text strong { color: var(--text); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .hero-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .home-inner { grid-template-columns: 1fr; }
+  .mcp-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .steps::before { display: none; }
+  .step-arrow { display: none; }
+  h1.hero-title { font-size: 2.5rem; }
+  .hero-code { display: none; }
+  .targets-grid { grid-template-columns: repeat(2, 1fr); }
+  footer { flex-direction: column; text-align: center; }
+}
+
+/* ── APPLAA FEATURE ── */
+.applaa-strip {
+  background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 4rem 2rem;
+}
+.applaa-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;
+}
+.feature-list { list-style: none; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 12px; }
+.feature-list li {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 0.9rem; color: var(--text-muted);
+}
+.feature-list li .fi {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(249,115,22,0.15); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 900; flex-shrink: 0; margin-top: 1px;
+}
+.feature-list li strong { color: var(--text); }
+
+@media (max-width: 768px) {
+  .applaa-inner { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-mark">A</div>
+    AppyScript
+  </div>
+  <ul class="nav-links">
+    <li><a href="#targets">Targets</a></li>
+    <li><a href="#home-showcase">Applaa Home</a></li>
+    <li><a href="#mcp">MCP</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="https://github.com/rahulbachina/appyscript">GitHub</a></li>
+  </ul>
+  <div class="nav-cta">
+    <a href="https://github.com/rahulbachina/appyscript" class="btn btn-ghost">Docs</a>
+    <a href="#install" class="btn btn-primary">Get Started</a>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<div id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Now in Beta — MCP server available
+      </div>
+      <h1 class="hero-title">
+        Write what<br>
+        you <span class="accent">mean.</span><br>
+        <span class="dim">Build anything.</span>
+      </h1>
+      <p class="hero-desc">
+        AppyScript is the first English-first programming language built for robotics.
+        No whitespace traps. No cryptic syntax. Just human-readable code that runs
+        on real hardware — and real homes.
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn btn-primary" style="padding:12px 24px;font-size:0.95rem;">
+          Install now
+        </a>
+        <a href="https://github.com/rahulbachina/appyscript" class="btn btn-ghost" style="padding:12px 24px;font-size:0.95rem;">
+          View on GitHub
+        </a>
+      </div>
+      <div class="hero-targets">
+        <span class="target-chip"><span class="dot" style="background:#3b82f6"></span>ESP32</span>
+        <span class="target-chip"><span class="dot" style="background:#14b8a6"></span>Arduino</span>
+        <span class="target-chip"><span class="dot" style="background:#a855f7"></span>Pico</span>
+        <span class="target-chip"><span class="dot" style="background:#ec4899"></span>micro:bit</span>
+        <span class="target-chip"><span class="dot" style="background:#f59e0b"></span>CircuitPython</span>
+        <span class="target-chip"><span class="dot" style="background:#f97316"></span>Applaa Home</span>
+      </div>
+    </div>
+
+    <div class="hero-code">
+      <div class="hero-code-badge">APPYSCRIPT</div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-dots">
+            <div class="code-dot red"></div>
+            <div class="code-dot amber"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <span class="code-label">guard_robot.appy</span>
+        </div>
+        <div class="code-body">
+          <div class="code-line"><span class="ln">1</span><span class="cm">&nbsp;# Guard robot — runs on ESP32</span></div>
+          <div class="code-line"><span class="ln">2</span>&nbsp;</div>
+          <div class="code-line"><span class="ln">3</span>&nbsp;<span class="kw">when</span>&nbsp;<span class="id">distance</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">30</span><span class="unit">cm</span></div>
+          <div class="code-line"><span class="ln">4</span><span class="indent-1"><span class="fn">say</span>&nbsp;<span class="str">"INTRUDER ALERT!"</span></span></div>
+          <div class="code-line"><span class="ln">5</span><span class="indent-1"><span class="fn">show</span>&nbsp;<span class="id-o">angry</span></span></div>
+          <div class="code-line"><span class="ln">6</span><span class="indent-1"><span class="fn">spin</span>&nbsp;<span class="kw">right</span>&nbsp;<span class="num">180</span><span class="unit">°</span></span></div>
+          <div class="code-line"><span class="ln">7</span>&nbsp;<span class="kw">end</span></div>
+          <div class="code-line"><span class="ln">8</span>&nbsp;</div>
+          <div class="code-line"><span class="ln">9</span>&nbsp;<span class="kw">when</span>&nbsp;<span class="id">distance</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">100</span><span class="unit">cm</span></div>
+          <div class="code-line"><span class="ln">10</span><span class="indent-1"><span class="fn">show</span>&nbsp;<span class="id-g">happy</span></span></div>
+          <div class="code-line"><span class="ln">11</span><span class="indent-1"><span class="fn">say</span>&nbsp;<span class="str">"All clear!"</span></span></div>
+          <div class="code-line"><span class="ln">12</span>&nbsp;<span class="kw">end</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- ══ WHY APPYSCRIPT ══ -->
+<section>
+  <div class="section-label">The Language</div>
+  <h2 class="section-title">Code that reads like<br>a sentence.</h2>
+  <p class="section-desc">
+    Python punishes you for a missing space. C++ buries logic under syntax.
+    AppyScript uses plain English structure — <code style="color:var(--kw);font-family:var(--mono)">when</code>,
+    <code style="color:var(--kw);font-family:var(--mono)">end</code>, <code style="color:var(--fn);font-family:var(--mono)">say</code>,
+    <code style="color:var(--fn);font-family:var(--mono)">spin</code> — so kids focus on ideas, not punctuation.
+  </p>
+
+  <div class="callout" style="margin-top:2.5rem">
+    <div class="callout-icon">💡</div>
+    <div class="callout-text">
+      <strong>No whitespace errors, ever.</strong> AppyScript uses <code style="color:var(--kw);font-family:var(--mono)">end</code> keywords to close blocks —
+      the same way kids naturally finish a thought. Indent however you like; the compiler doesn't care.
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:2rem;">
+    <div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--text-dim);letter-spacing:0.08em;margin-bottom:12px;text-transform:uppercase;">AppyScript</div>
+      <div class="code-block">
+        <div class="code-body" style="padding:1rem 1.25rem;">
+          <div class="code-line"><span class="kw">when</span>&nbsp;<span class="id">button_a</span>&nbsp;<span class="kw">is</span>&nbsp;<span class="id-g">pressed</span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">move</span>&nbsp;<span class="kw">forward</span>&nbsp;<span class="num">2</span><span class="unit">s</span></span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">turn</span>&nbsp;<span class="kw">left</span>&nbsp;<span class="num">90</span><span class="unit">°</span></span></div>
+          <div class="code-line"><span class="kw">end</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--text-dim);letter-spacing:0.08em;margin-bottom:12px;text-transform:uppercase;">Arduino equivalent</div>
+      <div class="code-block">
+        <div class="code-body" style="padding:1rem 1.25rem;color:var(--text-muted);">
+          <div class="code-line"><span style="color:#7d8590">void loop() {</span></div>
+          <div class="code-line"><span class="indent-1" style="color:#7d8590">if (digitalRead(BTN_A)) {</span></div>
+          <div class="code-line"><span class="indent-2" style="color:#7d8590">driveForward(2000);</span></div>
+          <div class="code-line"><span class="indent-2" style="color:#7d8590">turnLeft(90);</span></div>
+          <div class="code-line"><span class="indent-1" style="color:#7d8590">}</span></div>
+          <div class="code-line"><span style="color:#7d8590">}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- ══ TARGETS ══ -->
+<section id="targets">
+  <div class="section-label">Compile Targets</div>
+  <h2 class="section-title">6 targets.<br>One language.</h2>
+  <p class="section-desc">
+    Write your AppyScript once. Compile to any platform — from a £4 microcontroller
+    to every light in your house.
+  </p>
+
+  <div class="targets-grid">
+    <div class="target-card tc-esp32">
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="8" width="20" height="12" rx="2" fill="#3b82f6" opacity="0.9"/><rect x="8" y="4" width="2" height="4" rx="1" fill="#3b82f6"/><rect x="13" y="4" width="2" height="4" rx="1" fill="#3b82f6"/><rect x="18" y="4" width="2" height="4" rx="1" fill="#3b82f6"/><rect x="8" y="20" width="2" height="4" rx="1" fill="#3b82f6"/><rect x="13" y="20" width="2" height="4" rx="1" fill="#3b82f6"/><rect x="18" y="20" width="2" height="4" rx="1" fill="#3b82f6"/></svg>
+      </div>
+      <div class="target-name">ESP32</div>
+      <div class="target-desc">Wi-Fi, Bluetooth, sensors — the maker favourite</div>
+    </div>
+    <div class="target-card tc-arduino">
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="9" cy="14" rx="5" ry="5" fill="#14b8a6" opacity="0.9"/><ellipse cx="19" cy="14" rx="5" ry="5" fill="#14b8a6" opacity="0.9"/><rect x="14" y="12" width="0" height="4" fill="none"/><line x1="6" y1="14" x2="11" y2="14" stroke="white" stroke-width="2"/><line x1="17" y1="12" x2="21" y2="12" stroke="white" stroke-width="2"/><line x1="17" y1="16" x2="21" y2="16" stroke="white" stroke-width="2"/></svg>
+      </div>
+      <div class="target-name">Arduino</div>
+      <div class="target-desc">The classic — millions of boards in classrooms worldwide</div>
+    </div>
+    <div class="target-card tc-pico">
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="10" width="18" height="8" rx="2" fill="#a855f7" opacity="0.9"/><circle cx="9" cy="14" r="2" fill="white" opacity="0.7"/><rect x="13" y="13" width="7" height="2" rx="1" fill="white" opacity="0.5"/></svg>
+      </div>
+      <div class="target-name">Raspberry Pi Pico</div>
+      <div class="target-desc">Dual-core ARM — powerful, tiny, affordable</div>
+    </div>
+    <div class="target-card tc-microbit">
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="9" width="20" height="10" rx="3" fill="#ec4899" opacity="0.9"/><circle cx="10" cy="14" r="1.5" fill="white"/><circle cx="14" cy="14" r="1.5" fill="white"/><circle cx="18" cy="14" r="1.5" fill="white"/><circle cx="10" cy="11" r="1" fill="white" opacity="0.5"/><circle cx="18" cy="11" r="1" fill="white" opacity="0.5"/></svg>
+      </div>
+      <div class="target-name">micro:bit</div>
+      <div class="target-desc">UK schools favourite — LED matrix, accelerometer built in</div>
+    </div>
+    <div class="target-card tc-circuit">
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="7" fill="#f59e0b" opacity="0.9"/><circle cx="14" cy="14" r="3" fill="white" opacity="0.8"/><rect x="13" y="4" width="2" height="4" rx="1" fill="#f59e0b"/><rect x="13" y="20" width="2" height="4" rx="1" fill="#f59e0b"/><rect x="4" y="13" width="4" height="2" rx="1" fill="#f59e0b"/><rect x="20" y="13" width="4" height="2" rx="1" fill="#f59e0b"/></svg>
+      </div>
+      <div class="target-name">CircuitPython</div>
+      <div class="target-desc">Adafruit boards — drag-and-drop development</div>
+    </div>
+    <div class="target-card tc-home">
+      <div class="new-badge">NEW</div>
+      <div class="target-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 4L4 12v12h7v-7h6v7h7V12L14 4z" fill="#f97316" opacity="0.9"/><rect x="12" y="16" width="4" height="4" rx="1" fill="white" opacity="0.8"/></svg>
+      </div>
+      <div class="target-name">Applaa Home</div>
+      <div class="target-desc">Your house is a robot. Lights, speakers, cameras — all AppyScript</div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- ══ APPLAA HOME SHOWCASE ══ -->
+<div id="home-showcase" class="full-bleed">
+  <div class="home-inner" style="padding:0 2rem;">
+    <div>
+      <div class="section-label">Applaa Home</div>
+      <h2 class="section-title">Your house<br>is a robot.</h2>
+      <p class="section-desc" style="margin-bottom:1.5rem;">
+        The same language you use to spin a motor or light an LED
+        now controls your bedroom lights, doorbell camera, and
+        smart speakers. One syntax. Every room.
+      </p>
+
+      <div class="home-pill">&#127968; Applaa Home</div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-dots">
+            <div class="code-dot red"></div>
+            <div class="code-dot amber"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <span class="code-label">evening_routine.appy</span>
+        </div>
+        <div class="code-body">
+          <div class="code-line"><span class="ln">1</span>&nbsp;<span class="cm"># Runs every day at sunset</span></div>
+          <div class="code-line"><span class="ln">2</span>&nbsp;</div>
+          <div class="code-line"><span class="ln">3</span>&nbsp;<span class="kw">when</span>&nbsp;<span class="id">start</span></div>
+          <div class="code-line"><span class="ln">4</span><span class="indent-1"><span class="fn">set</span>&nbsp;<span class="id-o">bedroom_light</span>&nbsp;<span class="kw">to</span>&nbsp;<span class="str">"blue"</span></span></div>
+          <div class="code-line"><span class="ln">5</span><span class="indent-1"><span class="fn">set</span>&nbsp;<span class="id-o">kitchen_light</span>&nbsp;<span class="kw">to</span>&nbsp;<span class="str">"warm"</span>&nbsp;<span class="kw">at</span>&nbsp;<span class="num">40</span><span class="unit">%</span></span></div>
+          <div class="code-line"><span class="ln">6</span><span class="indent-1"><span class="fn">say</span>&nbsp;<span class="str">"Good evening!"</span></span></div>
+          <div class="code-line"><span class="ln">7</span>&nbsp;<span class="kw">end</span></div>
+          <div class="code-line"><span class="ln">8</span>&nbsp;</div>
+          <div class="code-line"><span class="ln">9</span>&nbsp;<span class="kw">when</span>&nbsp;<span class="id">doorbell</span>&nbsp;<span class="kw">is</span>&nbsp;<span class="id-g">pressed</span></div>
+          <div class="code-line"><span class="ln">10</span><span class="indent-1"><span class="fn">show</span>&nbsp;<span class="id-o">doorbell_camera</span>&nbsp;<span class="kw">on</span>&nbsp;<span class="id">tv</span></span></div>
+          <div class="code-line"><span class="ln">11</span><span class="indent-1"><span class="fn">say</span>&nbsp;<span class="str">"Someone's at the door!"</span></span></div>
+          <div class="code-line"><span class="ln">12</span>&nbsp;<span class="kw">end</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-visual">
+      <div class="house-diagram">
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.5rem;">Live Home State</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;box-shadow:0 0 8px var(--green);"></div>
+          <span style="font-size:0.8rem;color:var(--green);font-weight:600;">Connected — 12 devices</span>
+        </div>
+        <div class="room-grid">
+          <div class="room active">
+            <div class="room-name">Bedroom</div>
+            <div class="room-state">
+              <div class="room-dot"></div>
+              Blue · 80%
+            </div>
+          </div>
+          <div class="room active">
+            <div class="room-name">Kitchen</div>
+            <div class="room-state">
+              <div class="room-dot"></div>
+              Warm · 40%
+            </div>
+          </div>
+          <div class="room idle">
+            <div class="room-name">Living Room</div>
+            <div class="room-state">
+              <div class="room-dot"></div>
+              Off
+            </div>
+          </div>
+          <div class="room idle">
+            <div class="room-name">Hallway</div>
+            <div class="room-state">
+              <div class="room-dot"></div>
+              Off
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:8px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Active routines</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;">
+              <span style="color:var(--text-muted)">evening_routine.appy</span>
+              <span style="color:var(--green);font-size:0.72rem;font-weight:600;">RUNNING</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;">
+              <span style="color:var(--text-muted)">guard_robot.appy</span>
+              <span style="color:var(--accent2);font-size:0.72rem;font-weight:600;">WATCHING</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="section-divider" style="margin-top:5rem;">
+
+<!-- ══ HOW IT WORKS ══ -->
+<section id="how">
+  <div style="text-align:center;margin-bottom:0;">
+    <div class="section-label" style="justify-content:center;">How It Works</div>
+    <h2 class="section-title" style="text-align:center;">Write → Compile → Run</h2>
+    <p class="section-desc" style="margin:0 auto;text-align:center;">
+      Three steps from idea to robot. No setup headaches, no toolchain nightmares.
+    </p>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Write</h3>
+      <p>Type AppyScript in any editor — or let an AI agent write it for you. The language reads like instructions you'd give a friend.</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Compile</h3>
+      <p>Run <code style="font-family:var(--mono);color:var(--green);font-size:0.85em">appyscript build --target esp32</code> — the compiler translates your English logic into platform-native code instantly.</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Run</h3>
+      <p>Flash to your device or push to Applaa Home. Your robot spins, speaks, and reacts — exactly as you wrote it.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:3rem;">
+    <div class="code-block" style="max-width:700px;margin:0 auto;">
+      <div class="code-header">
+        <div class="code-dots">
+          <div class="code-dot red"></div>
+          <div class="code-dot amber"></div>
+          <div class="code-dot green"></div>
+        </div>
+        <span class="code-label">terminal</span>
+      </div>
+      <div class="code-body">
+        <div class="code-line"><span style="color:var(--text-dim)">$</span>&nbsp;<span style="color:var(--green)">appyscript build</span>&nbsp;<span style="color:var(--text-muted)">guard_robot.appy</span>&nbsp;<span style="color:var(--accent2)">--target esp32</span></div>
+        <div class="code-line" style="margin-top:4px"><span style="color:var(--text-dim)">✓</span>&nbsp;<span style="color:var(--text-muted)">Parsed 12 lines</span></div>
+        <div class="code-line"><span style="color:var(--text-dim)">✓</span>&nbsp;<span style="color:var(--text-muted)">Compiled to Arduino C++</span></div>
+        <div class="code-line"><span style="color:var(--text-dim)">✓</span>&nbsp;<span style="color:var(--text-muted)">Flashed to ESP32 at /dev/cu.usbserial</span></div>
+        <div class="code-line" style="margin-top:4px"><span style="color:var(--green);font-weight:600)">🤖 Robot is live.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- ══ APPLAA BUILDER ══ -->
+<div class="applaa-strip">
+  <div class="applaa-inner">
+    <div>
+      <div class="section-label">Built into Applaa</div>
+      <h2 class="section-title">AI agents write<br>AppyScript for kids.</h2>
+      <p class="section-desc">
+        Inside Applaa Builder, the AI agents Appy and Pi understand AppyScript natively.
+        Kids describe what they want. Appy and Pi write the code. The robot just works.
+      </p>
+      <ul class="feature-list">
+        <li>
+          <div class="fi">✓</div>
+          <div><strong>Appy</strong> — the planning agent that turns a kid's idea into a structured AppyScript program</div>
+        </li>
+        <li>
+          <div class="fi">✓</div>
+          <div><strong>Pi</strong> — the build agent that writes, checks, and flashes AppyScript to the target device</div>
+        </li>
+        <li>
+          <div class="fi">✓</div>
+          <div><strong>Live preview</strong> — see your robot's logic in the AppyScript viewer before it runs on hardware</div>
+        </li>
+        <li>
+          <div class="fi">✓</div>
+          <div><strong>Error messages in English</strong> — Pi explains what went wrong in plain language, not compiler output</div>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-dots">
+            <div class="code-dot red"></div>
+            <div class="code-dot amber"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <span class="code-label">Applaa Builder — Pi agent output</span>
+        </div>
+        <div class="code-body">
+          <div class="code-line"><span class="cm">&nbsp;# Pi wrote this for Zara, age 9</span></div>
+          <div class="code-line"><span class="cm">&nbsp;# "make it dance when I clap"</span></div>
+          <div class="code-line">&nbsp;</div>
+          <div class="code-line"><span class="kw">when</span>&nbsp;<span class="id">sound</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">70</span><span class="unit">db</span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">spin</span>&nbsp;<span class="kw">right</span>&nbsp;<span class="num">360</span><span class="unit">°</span></span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">wait</span>&nbsp;<span class="num">0.5</span><span class="unit">s</span></span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">spin</span>&nbsp;<span class="kw">left</span>&nbsp;<span class="num">360</span><span class="unit">°</span></span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">say</span>&nbsp;<span class="str">"Woohoo!"</span></span></div>
+          <div class="code-line"><span class="indent-1"><span class="fn">show</span>&nbsp;<span class="id-g">happy</span></span></div>
+          <div class="code-line"><span class="kw">end</span></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;text-align:center;">
+        <a href="https://applaa.com" class="btn btn-ghost" style="width:100%;justify-content:center;">
+          Learn about Applaa Builder →
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MCP SERVER ══ -->
+<section id="mcp">
+  <div class="mcp-grid">
+    <div>
+      <div class="section-label">MCP Server</div>
+      <h2 class="section-title">Every AI can<br>speak AppyScript.</h2>
+      <p class="section-desc">
+        The AppyScript MCP server exposes the full compiler and language spec to any AI agent.
+        Claude, Cursor, Codex, GPT-4o — one install and they can all generate, validate,
+        and flash AppyScript programs.
+      </p>
+      <div class="ai-agents">
+        <div class="agent-pill agent-claude">
+          <div class="agent-dot"></div> Claude
+        </div>
+        <div class="agent-pill agent-cursor">
+          <div class="agent-dot"></div> Cursor
+        </div>
+        <div class="agent-pill agent-codex">
+          <div class="agent-dot"></div> Codex
+        </div>
+        <div class="agent-pill agent-gpt">
+          <div class="agent-dot"></div> GPT-4o
+        </div>
+        <div class="agent-pill agent-appy">
+          <div class="agent-dot"></div> Appy &amp; Pi
+        </div>
+      </div>
+      <div class="callout" style="margin-top:1.5rem;">
+        <div class="callout-icon">⚡</div>
+        <div class="callout-text">
+          <strong>One-line install.</strong> The MCP server ships as an npm package.
+          Add it to your <code style="font-family:var(--mono);color:var(--accent)">mcp.json</code> and your AI agent gets full AppyScript superpowers immediately.
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="code-dots">
+            <div class="code-dot red"></div>
+            <div class="code-dot amber"></div>
+            <div class="code-dot green"></div>
+          </div>
+          <span class="code-label">mcp.json</span>
+        </div>
+        <div class="code-body">
+          <div class="code-line"><span style="color:var(--text-muted)">{</span></div>
+          <div class="code-line"><span class="indent-1"><span class="str">"mcpServers"</span><span style="color:var(--text-muted)">: {</span></span></div>
+          <div class="code-line"><span class="indent-2"><span class="str">"appyscript"</span><span style="color:var(--text-muted)">: {</span></span></div>
+          <div class="code-line" style="padding-left:4.5em"><span class="str">"command"</span><span style="color:var(--text-muted)">: </span><span class="str">"npx"</span><span style="color:var(--text-muted)">,</span></div>
+          <div class="code-line" style="padding-left:4.5em"><span class="str">"args"</span><span style="color:var(--text-muted)">: [</span></div>
+          <div class="code-line" style="padding-left:6em"><span class="str">"appyscript-mcp"</span></div>
+          <div class="code-line" style="padding-left:4.5em"><span style="color:var(--text-muted)">]</span></div>
+          <div class="code-line"><span class="indent-2"><span style="color:var(--text-muted)">}</span></span></div>
+          <div class="code-line"><span class="indent-1"><span style="color:var(--text-muted)">}</span></span></div>
+          <div class="code-line"><span style="color:var(--text-muted)">}</span></div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="code-block">
+          <div class="code-header">
+            <div class="code-dots">
+              <div class="code-dot red"></div>
+              <div class="code-dot amber"></div>
+              <div class="code-dot green"></div>
+            </div>
+            <span class="code-label">Available MCP tools</span>
+          </div>
+          <div class="code-body" style="padding:0.75rem 1.25rem;">
+            <div class="code-line" style="font-size:0.82rem;"><span class="fn">appyscript_compile</span><span style="color:var(--text-dim)">(source, target)</span></div>
+            <div class="code-line" style="font-size:0.82rem;"><span class="fn">appyscript_validate</span><span style="color:var(--text-dim)">(source)</span></div>
+            <div class="code-line" style="font-size:0.82rem;"><span class="fn">appyscript_flash</span><span style="color:var(--text-dim)">(binary, port)</span></div>
+            <div class="code-line" style="font-size:0.82rem;"><span class="fn">appyscript_home_push</span><span style="color:var(--text-dim)">(routine)</span></div>
+            <div class="code-line" style="font-size:0.82rem;"><span class="fn">appyscript_list_targets</span><span style="color:var(--text-dim)">()</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- ══ INSTALL ══ -->
+<section id="install">
+  <div class="section-label" style="justify-content:center;">Get Started</div>
+  <h2 class="section-title" style="text-align:center;">Ship your first robot<br>in 5 minutes.</h2>
+  <div class="install-box">
+    <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:0.5rem;">Install the AppyScript CLI globally</p>
+    <div class="install-cmd">
+      <span class="prompt">$</span>
+      <code>npm install -g appyscript</code>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install -g appyscript').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>
+    </div>
+    <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:1.75rem;">
+      Requires Node.js 18+. Works on macOS, Linux, Windows.
+    </p>
+    <div class="install-links">
+      <a href="https://github.com/rahulbachina/appyscript">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a href="https://github.com/rahulbachina/appyscript">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0"><path d="M1 2.5h14M1 5.5h14M4 .5v15M7 .5v15M10 .5v15" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+        Full Docs
+      </a>
+      <a href="https://applaa.com">
+        Applaa Builder →
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">
+    <div class="nav-logo-mark" style="width:22px;height:22px;font-size:11px;border-radius:5px;">A</div>
+    AppyScript — by Applaa
+  </div>
+  <div style="color:var(--text-dim);font-size:0.8rem;">
+    English-first. Hardware-native. Kid-ready.
+  </div>
+  <div class="footer-links">
+    <a href="https://github.com/rahulbachina/appyscript">GitHub</a>
+    <a href="https://github.com/rahulbachina/appyscript">Docs</a>
+    <a href="https://applaa.com">Applaa</a>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+</script>
+</body>
+</html>

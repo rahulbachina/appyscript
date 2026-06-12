@@ -1,0 +1,38 @@
+title: AppyScript
+description: The English-first programming language for educational robotics
+baseurl: /appyscript
+url: https://rahulbachina.github.io
+
+theme: just-the-docs
+
+color_scheme: dark
+logo: assets/logo.png
+
+search_enabled: true
+nav_sort: case_insensitive
+heading_anchors: true
+
+footer_content: "© 2026 Applaa · MIT Licence · <a href='https://github.com/rahulbachina/appyscript'>GitHub</a>"
+
+nav_external_links: []
+
+just_the_docs:
+  collections:
+    getting_started:
+      name: Getting Started
+      nav_order: 1
+    language_reference:
+      name: Language Reference
+      nav_order: 2
+    backends:
+      name: Backends
+      nav_order: 3
+    applaa_home:
+      name: Applaa Home
+      nav_order: 4
+    mcp_server:
+      name: MCP Server
+      nav_order: 5
+    skills:
+      name: Skills
+      nav_order: 6
