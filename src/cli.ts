@@ -220,3 +220,9 @@ Targets: esp32 | arduino | pico | microbit | circuitpython
     break
   }
 }
+
+// ── Skills command (appended at build-time) ────────────────────────────────────
+// appyscript skills list
+// appyscript skills add <name> [--agent claude|cursor|codex]
+// Usage wired into the main switch below via `skills` case.
+// The actual implementation lives in src/skills-installer.ts.

@@ -1,0 +1,37 @@
+# Quiz Robot
+# What it teaches: ask, template strings, save/load, match/case
+# Works on: esp32, pico
+
+when start
+  load score
+  say "Welcome back! Your score is {score}"
+  show happy
+end
+
+when button_a pressed
+  let answer = ask "What is 5 + 3?"
+  if answer == "8"
+    change score by 1
+    save score
+    say "Correct! Score: {score}"
+    show excited
+    play "success"
+  else
+    say "Not quite! The answer is 8"
+    show sad
+  end
+end
+
+when button_b pressed
+  match score
+    case < 3
+      say "Keep practising — you can do it!"
+      show thinking
+    case 3 to 7
+      say "Good work — score is {score}!"
+      show happy
+    case > 7
+      say "Amazing! Score: {score} — you're a star!"
+      show excited
+  end
+end
