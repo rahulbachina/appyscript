@@ -1,7 +1,7 @@
 {
   "name": "appyscript",
-  "version": "2.0.0",
-  "description": "AppyScript — the first English-first programming language for educational robotics.",
+  "version": "1.0.0",
+  "description": "The first English-first programming language for educational robotics. Compile to ESP32, Pico, micro:bit, Arduino, and CircuitPython.",
   "author": "Applaa <rahul.bachin@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/rahulbachina/appyscript",
@@ -12,13 +12,15 @@
   "keywords": [
     "robotics",
     "education",
+    "kids",
     "appyscript",
     "esp32",
     "arduino",
     "micropython",
-    "kids",
-    "language",
-    "compiler"
+    "pico",
+    "microbit",
+    "compiler",
+    "language"
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,7 +32,11 @@
     "dev": "tsc --watch",
     "test": "npm run build && node --test dist/test/compiler.test.js",
     "mcp": "node dist/mcp/server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test",
+    "release:dry": "npm publish --dry-run",
+    "publish:npm": "npm run build && npm test && npm publish",
+    "serve:playground": "npx serve playground -p 3000"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
@@ -38,5 +44,20 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/rahulbachina/appyscript/issues"
+  },
+  "files": [
+    "dist",
+    "vscode",
+    "runtime",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
