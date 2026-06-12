@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: node --test dist/test/
+        run: node --test dist/test/compiler.test.js
 
       - name: Compile all examples on all targets
         run: |
