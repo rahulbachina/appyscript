@@ -13,6 +13,7 @@ import { arduinoBackend } from './backends/arduino'
 import { microbitBackend } from './backends/microbit'
 import { picoBackend }    from './backends/pico'
 import { circuitpythonBackend } from './backends/circuitpython'
+import { homeBackend } from './backends/home'
 import type { SourceMap } from './sourcemap'
 import type { Program } from './ast'
 
@@ -22,6 +23,20 @@ registry.register(arduinoBackend)
 registry.register(microbitBackend)
 registry.register(picoBackend)
 registry.register(circuitpythonBackend)
+registry.register(homeBackend)
+
+// Home hardware profile (virtual — no chip)
+HARDWARE_PROFILES['home'] = {
+  id: 'home',
+  name: 'Applaa Home',
+  runtime: 'MicroPython',
+  description: 'Smart home devices controlled via Applaa Home guardrail layer.',
+  sensors: { distance: false, light: false, temperature: false, touch: false, acceleration: false },
+  memory: { flashKB: 0, ramKB: 0 },
+  supportsAsync: false,
+  hasDisplay: false,
+  hasRadio: true,
+}
 
 export type Target = 'esp32' | 'arduino' | 'pico' | 'microbit' | string
 
