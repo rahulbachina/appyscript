@@ -44,12 +44,15 @@ export class Linter {
     this.usedBehaviours.clear()
     this.definedBehaviours.clear()
 
-    // Collect defined behaviours and used behaviours
+    // Collect defined behaviours
     for (const block of program.blocks) {
       if (block.kind === 'define') this.definedBehaviours.add(block.name)
     }
+    // Collect used behaviours — scan ALL blocks (when/forever/define)
     for (const block of program.blocks) {
-      this.collectUsedBehaviours(block.kind !== 'define' ? [] : block.body)
+      if (block.kind === 'when' || block.kind === 'forever' || block.kind === 'define') {
+        this.collectUsedBehaviours(block.body)
+      }
     }
 
     for (const block of program.blocks) {

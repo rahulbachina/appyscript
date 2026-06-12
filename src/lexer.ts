@@ -1,78 +1,44 @@
-// AppyScript Lexer
-// Case-insensitive keywords. Blocks close with 'end' — no significant whitespace.
-// This means kids can't make indentation mistakes.
+// AppyScript Lexer — v3
+// Added: PICK, RANDOM, ADD, LIST, ITEM, OF, SIZE, CHANGE, BY keywords
 
 export type TokenKind =
   // Structure
-  | 'NEWLINE' | 'EOF' | 'END'
-  | 'LPAREN' | 'RPAREN'
-  // Literals
-  | 'STRING' | 'NUMBER' | 'IDENT'
-  // Units (attached to numbers during lex)
-  | 'PERCENT'    // 50%
-  | 'DEGREES'    // 90° or 90 degrees
-  | 'UNIT_CM'    // 30cm
-  | 'UNIT_S'     // 2s
-  | 'UNIT_MS'    // 500ms
-  | 'UNIT_M'     // 2m
-  // Operators
-  | 'LT' | 'GT' | 'LTE' | 'GTE' | 'EQ' | 'NEQ'
-  | 'PLUS' | 'MINUS' | 'STAR' | 'SLASH' | 'ASSIGN'
-  // ── Keywords (all case-insensitive) ──────────────────────────────────────
-  | 'WHEN' | 'ON' | 'FOREVER' | 'DEFINE' | 'DO'
-  | 'IF' | 'ELSE' | 'REPEAT' | 'TIMES' | 'WHILE' | 'UNTIL'
-  | 'AND' | 'OR' | 'NOT'
-  | 'LET' | 'SET' | 'TO' | 'REMEMBER' | 'CHANGE' | 'BY'
-  | 'THEN' | 'OTHERWISE' | 'MATCH' | 'CASE' | 'DEFAULT'
+  | 'WHEN' | 'ON' | 'FOREVER' | 'DEFINE' | 'END' | 'DO'
+  // Control
+  | 'IF' | 'ELSE' | 'OTHERWISE' | 'THEN' | 'REPEAT' | 'TIMES' | 'WHILE' | 'UNTIL'
+  | 'MATCH' | 'CASE' | 'DEFAULT'
   // Actions
-  | 'MOVE' | 'TURN' | 'SPIN' | 'STOP' | 'SAY' | 'PLAY' | 'SHOW' | 'WAIT' | 'SEND' | 'BACK'
-  // Direction keywords
-  | 'FORWARD' | 'BACKWARD' | 'LEFT' | 'RIGHT'
-  // Speed modifiers
-  | 'AT' | 'FOR' | 'FULL' | 'SLOW' | 'FAST' | 'HALF' | 'SPEED'
-  // Trigger words
-  | 'PRESSED' | 'RELEASED' | 'STARTS' | 'RECEIVES' | 'EVERY' | 'SHAKEN' | 'TILTED'
-  // Hardware triggers
-  | 'BUTTON_A' | 'BUTTON_B' | 'START' | 'TIMER' | 'RECEIVED'
-  // Sensors
+  | 'MOVE' | 'TURN' | 'SPIN' | 'STOP' | 'SAY' | 'PLAY' | 'SHOW' | 'WAIT' | 'SEND'
+  | 'BACK' | 'BACKWARD' | 'FORWARD' | 'LEFT' | 'RIGHT'
+  // Variables
+  | 'LET' | 'SET' | 'TO' | 'REMEMBER' | 'CHANGE' | 'BY'
+  // Lists
+  | 'LIST' | 'ADD' | 'ITEM' | 'OF' | 'SIZE'
+  // Random
+  | 'PICK' | 'RANDOM'
+  // Sensors / triggers
   | 'DISTANCE' | 'LIGHT' | 'TEMPERATURE' | 'TOUCH' | 'ACCELERATION'
-  // Face expressions
-  | 'HAPPY' | 'SAD' | 'THINKING' | 'EXCITED' | 'ANGRY' | 'ALERT' | 'SLEEP' | 'CALM' | 'CONFUSED' | 'DIZZY'
-  // Display
-  | 'TEXT' | 'NUMBER_KW'
-  // Boolean literals
-  | 'YES' | 'NO' | 'TRUE' | 'FALSE'
+  | 'BUTTON_A' | 'BUTTON_B' | 'SHAKEN' | 'TILTED' | 'START' | 'STARTS'
+  | 'EVERY' | 'TIMER' | 'RECEIVED' | 'RECEIVES'
+  | 'PRESSED' | 'RELEASED'
+  // Speed
+  | 'AT' | 'FOR' | 'FULL' | 'SLOW' | 'FAST' | 'HALF' | 'SPEED' | 'TEXT' | 'NUMBER'
+  // Expressions
+  | 'HAPPY' | 'SAD' | 'THINKING' | 'EXCITED' | 'ANGRY'
+  | 'ALERT' | 'SLEEP' | 'CALM' | 'CONFUSED' | 'DIZZY'
+  // Logic
+  | 'AND' | 'OR' | 'NOT' | 'YES' | 'NO' | 'TRUE' | 'FALSE'
+  // Operators
+  | 'LT' | 'GT' | 'LTE' | 'GTE' | 'EQ' | 'ASSIGN'
+  | 'PLUS' | 'MINUS' | 'STAR' | 'SLASH'
+  // Literals
+  | 'NUMBER' | 'STRING' | 'IDENT'
+  // Units (value carries the numeric part)
+  | 'UNIT_CM' | 'UNIT_S' | 'UNIT_MS' | 'UNIT_M' | 'PERCENT'
+  // Structure
+  | 'NEWLINE' | 'EOF'
 
-export interface Token {
-  kind: TokenKind
-  value: string
-  line: number
-  col: number
-}
-
-const KEYWORDS: Record<string, TokenKind> = {
-  when: 'WHEN', on: 'ON', forever: 'FOREVER', define: 'DEFINE', do: 'DO', end: 'END',
-  if: 'IF', else: 'ELSE', then: 'THEN', otherwise: 'OTHERWISE', match: 'MATCH', case: 'CASE', default: 'DEFAULT',
-  repeat: 'REPEAT', times: 'TIMES', while: 'WHILE', until: 'UNTIL',
-  and: 'AND', or: 'OR', not: 'NOT',
-  let: 'LET', set: 'SET', to: 'TO', remember: 'REMEMBER', change: 'CHANGE', by: 'BY',
-  move: 'MOVE', turn: 'TURN', spin: 'SPIN', stop: 'STOP', say: 'SAY', play: 'PLAY',
-  show: 'SHOW', wait: 'WAIT', send: 'SEND', back: 'BACK',
-  forward: 'FORWARD', backward: 'BACKWARD', left: 'LEFT', right: 'RIGHT',
-  at: 'AT', for: 'FOR', full: 'FULL', slow: 'SLOW', fast: 'FAST', half: 'HALF', speed: 'SPEED',
-  pressed: 'PRESSED', released: 'RELEASED', starts: 'STARTS', receives: 'RECEIVES',
-  every: 'EVERY', shaken: 'SHAKEN', tilted: 'TILTED',
-  button_a: 'BUTTON_A', button_b: 'BUTTON_B', start: 'START', timer: 'TIMER',
-  received: 'RECEIVED',
-  distance: 'DISTANCE', light: 'LIGHT', temperature: 'TEMPERATURE',
-  touch: 'TOUCH', acceleration: 'ACCELERATION',
-  happy: 'HAPPY', sad: 'SAD', thinking: 'THINKING', excited: 'EXCITED',
-  angry: 'ANGRY', alert: 'ALERT', sleep: 'SLEEP', calm: 'CALM',
-  confused: 'CONFUSED', dizzy: 'DIZZY',
-  text: 'TEXT', number: 'NUMBER_KW',
-  yes: 'YES', no: 'NO', true: 'TRUE', false: 'FALSE',
-  degrees: 'DEGREES',
-}
+export interface Token { kind: TokenKind; value: string; line: number; col: number }
 
 export class LexError extends Error {
   constructor(message: string, public line: number, public col: number) {
@@ -81,113 +47,135 @@ export class LexError extends Error {
   }
 }
 
+const KEYWORDS: Record<string, TokenKind> = {
+  when: 'WHEN', on: 'ON', forever: 'FOREVER', define: 'DEFINE', end: 'END', do: 'DO',
+  if: 'IF', else: 'ELSE', otherwise: 'OTHERWISE', then: 'THEN',
+  repeat: 'REPEAT', times: 'TIMES', while: 'WHILE', until: 'UNTIL',
+  match: 'MATCH', case: 'CASE', default: 'DEFAULT',
+  move: 'MOVE', turn: 'TURN', spin: 'SPIN', stop: 'STOP',
+  say: 'SAY', play: 'PLAY', show: 'SHOW', wait: 'WAIT', send: 'SEND',
+  back: 'BACK', backward: 'BACKWARD', forward: 'FORWARD', left: 'LEFT', right: 'RIGHT',
+  at: 'AT', for: 'FOR', full: 'FULL', slow: 'SLOW', fast: 'FAST', half: 'HALF',
+  speed: 'SPEED', text: 'TEXT', number: 'NUMBER',
+  let: 'LET', set: 'SET', to: 'TO', remember: 'REMEMBER', change: 'CHANGE', by: 'BY',
+  list: 'LIST', add: 'ADD', item: 'ITEM', of: 'OF', size: 'SIZE',
+  pick: 'PICK', random: 'RANDOM',
+  distance: 'DISTANCE', light: 'LIGHT', temperature: 'TEMPERATURE',
+  touch: 'TOUCH', acceleration: 'ACCELERATION',
+  button_a: 'BUTTON_A', button_b: 'BUTTON_B',
+  shaken: 'SHAKEN', tilted: 'TILTED', start: 'START', starts: 'STARTS',
+  every: 'EVERY', timer: 'TIMER', received: 'RECEIVED', receives: 'RECEIVES',
+  pressed: 'PRESSED', released: 'RELEASED',
+  happy: 'HAPPY', sad: 'SAD', thinking: 'THINKING', excited: 'EXCITED', angry: 'ANGRY',
+  alert: 'ALERT', sleep: 'SLEEP', calm: 'CALM', confused: 'CONFUSED', dizzy: 'DIZZY',
+  and: 'AND', or: 'OR', not: 'NOT', yes: 'YES', no: 'NO', true: 'TRUE', false: 'FALSE',
+  then2: 'THEN', match2: 'MATCH', case2: 'CASE', default2: 'DEFAULT',
+}
+
 export function tokenize(source: string): Token[] {
-  const lines = source.split('\n')
   const tokens: Token[] = []
-  let lineNum = 0
+  let i = 0, line = 1, col = 1
+  const len = source.length
 
-  for (const rawLine of lines) {
-    lineNum++
-    const trimmed = rawLine.trim()
-
-    // Skip blank lines and comment lines
-    if (trimmed === '' || trimmed.startsWith('#')) continue
-
-    let i = 0
-    while (i < trimmed.length) {
-      // Skip whitespace
-      if (trimmed[i] === ' ' || trimmed[i] === '\t') { i++; continue }
-      // Skip inline comments
-      if (trimmed[i] === '#') break
-
-      const col = i + 1
-
-      // String literals
-      if (trimmed[i] === '"' || trimmed[i] === "'") {
-        const quote = trimmed[i]; i++
-        let str = ''
-        while (i < trimmed.length && trimmed[i] !== quote) {
-          if (trimmed[i] === '\\' && i + 1 < trimmed.length) {
-            i++
-            str += trimmed[i] === 'n' ? '\n' : trimmed[i]
-          } else {
-            str += trimmed[i]
-          }
-          i++
-        }
-        if (i >= trimmed.length) throw new LexError('Unterminated string', lineNum, col)
-        i++
-        tokens.push({ kind: 'STRING', value: str, line: lineNum, col })
-        continue
-      }
-
-      // Numbers with optional unit suffixes
-      if (trimmed[i] >= '0' && trimmed[i] <= '9') {
-        let num = ''
-        while (i < trimmed.length && (trimmed[i] >= '0' && trimmed[i] <= '9' || trimmed[i] === '.')) {
-          num += trimmed[i++]
-        }
-        const rest = trimmed.slice(i)
-        if (trimmed[i] === '%') {
-          tokens.push({ kind: 'PERCENT', value: num, line: lineNum, col }); i++
-        } else if (trimmed[i] === '°') {
-          tokens.push({ kind: 'DEGREES', value: num, line: lineNum, col }); i++
-        } else if (rest.toLowerCase().startsWith('cm')) {
-          tokens.push({ kind: 'UNIT_CM', value: num, line: lineNum, col }); i += 2
-        } else if (rest.toLowerCase().startsWith('ms')) {
-          tokens.push({ kind: 'UNIT_MS', value: num, line: lineNum, col }); i += 2
-        } else if (trimmed[i]?.toLowerCase() === 's' && !/[a-zA-Z]/.test(trimmed[i + 1] ?? '')) {
-          tokens.push({ kind: 'UNIT_S', value: num, line: lineNum, col }); i++
-        } else if (trimmed[i]?.toLowerCase() === 'm' && !/[a-zA-Z]/.test(trimmed[i + 1] ?? '')) {
-          tokens.push({ kind: 'UNIT_M', value: num, line: lineNum, col }); i++
-        } else {
-          tokens.push({ kind: 'NUMBER', value: num, line: lineNum, col })
-        }
-        continue
-      }
-
-      // Degree symbol alone
-      if (trimmed[i] === '°') { i++; continue }
-
-      // Identifiers and keywords (case-insensitive, underscore-allowed)
-      if (/[a-zA-Z_]/.test(trimmed[i])) {
-        let word = ''
-        while (i < trimmed.length && /[a-zA-Z0-9_]/.test(trimmed[i])) {
-          word += trimmed[i++]
-        }
-        const lower = word.toLowerCase()
-        const kind: TokenKind = KEYWORDS[lower] ?? 'IDENT'
-        tokens.push({ kind, value: lower, line: lineNum, col })
-        continue
-      }
-
-      // Two-character operators
-      const two = trimmed.slice(i, i + 2)
-      if (two === '<=') { tokens.push({ kind: 'LTE', value: '<=', line: lineNum, col }); i += 2; continue }
-      if (two === '>=') { tokens.push({ kind: 'GTE', value: '>=', line: lineNum, col }); i += 2; continue }
-      if (two === '==') { tokens.push({ kind: 'EQ', value: '==', line: lineNum, col }); i += 2; continue }
-      if (two === '!=') { tokens.push({ kind: 'NEQ', value: '!=', line: lineNum, col }); i += 2; continue }
-
-      // Single-character operators
-      switch (trimmed[i]) {
-        case '<': tokens.push({ kind: 'LT', value: '<', line: lineNum, col }); break
-        case '>': tokens.push({ kind: 'GT', value: '>', line: lineNum, col }); break
-        case '=': tokens.push({ kind: 'ASSIGN', value: '=', line: lineNum, col }); break
-        case '+': tokens.push({ kind: 'PLUS', value: '+', line: lineNum, col }); break
-        case '-': tokens.push({ kind: 'MINUS', value: '-', line: lineNum, col }); break
-        case '*': tokens.push({ kind: 'STAR', value: '*', line: lineNum, col }); break
-        case '/': tokens.push({ kind: 'SLASH', value: '/', line: lineNum, col }); break
-        case '(': tokens.push({ kind: 'LPAREN', value: '(', line: lineNum, col }); break
-        case ')': tokens.push({ kind: 'RPAREN', value: ')', line: lineNum, col }); break
-        default:
-          throw new LexError(`Unexpected character: '${trimmed[i]}'`, lineNum, col)
-      }
-      i++
-    }
-
-    tokens.push({ kind: 'NEWLINE', value: '', line: lineNum, col: trimmed.length + 1 })
+  function advance() {
+    const ch = source[i++]
+    if (ch === '\n') { line++; col = 1 } else { col++ }
+    return ch
   }
 
-  tokens.push({ kind: 'EOF', value: '', line: lineNum + 1, col: 1 })
+  function peek(offset = 0) { return source[i + offset] }
+
+  function addTok(kind: TokenKind, value: string, l = line, c = col) {
+    tokens.push({ kind, value, line: l, col: c })
+  }
+
+  while (i < len) {
+    const l = line, c = col
+    const ch = source[i]
+
+    // Skip whitespace (not newlines)
+    if (ch === ' ' || ch === '\t' || ch === '\r') { advance(); continue }
+
+    // Comments
+    if (ch === '#') { while (i < len && source[i] !== '\n') advance(); continue }
+
+    // Newlines
+    if (ch === '\n') { advance(); addTok('NEWLINE', '\n', l, c); continue }
+
+    // Degree symbol °
+    if (ch === '°') { advance(); continue }
+
+    // Strings
+    if (ch === '"' || ch === "'") {
+      const quote = ch; advance()
+      let s = ''
+      while (i < len && source[i] !== quote) {
+        const c2 = advance()
+        if (c2 === '\\') {
+          const esc = advance()
+          s += esc === 'n' ? '\n' : esc === 't' ? '\t' : esc === '"' ? '"' : esc === "'" ? "'" : esc === '\\' ? '\\' : esc
+        } else { s += c2 }
+      }
+      if (i >= len) throw new LexError('Unterminated string literal', l, c)
+      advance() // closing quote
+      addTok('STRING', s, l, c)
+      continue
+    }
+
+    // Numbers (with optional unit suffix fused)
+    if (ch >= '0' && ch <= '9') {
+      let num = ''
+      while (i < len && (source[i] >= '0' && source[i] <= '9' || source[i] === '.')) num += advance()
+      // Check for unit suffix
+      if (source.slice(i, i + 2) === 'ms') {
+        advance(); advance()
+        addTok('UNIT_MS', num, l, c); continue
+      }
+      if (source[i] === 's' && !/[a-zA-Z]/.test(source[i + 1] ?? '')) {
+        advance()
+        addTok('UNIT_S', num, l, c); continue
+      }
+      if (source.slice(i, i + 2) === 'cm') {
+        advance(); advance()
+        addTok('UNIT_CM', num, l, c); continue
+      }
+      if (source[i] === 'm' && !/[a-zA-Z]/.test(source[i + 1] ?? '')) {
+        advance()
+        addTok('UNIT_M', num, l, c); continue
+      }
+      if (source[i] === '%') {
+        advance()
+        addTok('PERCENT', num, l, c); continue
+      }
+      addTok('NUMBER', num, l, c)
+      continue
+    }
+
+    // Identifiers and keywords (case-insensitive)
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_') {
+      let word = ''
+      while (i < len && (/[a-zA-Z0-9_]/.test(source[i]))) word += advance()
+      const lower = word.toLowerCase()
+      const kind = KEYWORDS[lower] ?? 'IDENT'
+      addTok(kind, lower, l, c)
+      continue
+    }
+
+    // Operators
+    if (ch === '<' && peek(1) === '=') { advance(); advance(); addTok('LTE', '<=', l, c); continue }
+    if (ch === '>' && peek(1) === '=') { advance(); advance(); addTok('GTE', '>=', l, c); continue }
+    if (ch === '=' && peek(1) === '=') { advance(); advance(); addTok('EQ', '==', l, c); continue }
+    if (ch === '<') { advance(); addTok('LT', '<', l, c); continue }
+    if (ch === '>') { advance(); addTok('GT', '>', l, c); continue }
+    if (ch === '=') { advance(); addTok('ASSIGN', '=', l, c); continue }
+    if (ch === '+') { advance(); addTok('PLUS', '+', l, c); continue }
+    if (ch === '-') { advance(); addTok('MINUS', '-', l, c); continue }
+    if (ch === '*') { advance(); addTok('STAR', '*', l, c); continue }
+    if (ch === '/') { advance(); addTok('SLASH', '/', l, c); continue }
+
+    throw new LexError(`Unexpected character: "${ch}"`, l, c)
+  }
+
+  addTok('EOF', '', line, col)
   return tokens
 }

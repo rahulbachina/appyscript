@@ -77,7 +77,9 @@ function statementsToOutput(
       const params = valueToDeviceParams(stmt.value)
       if (params) cmds.push({ device: stmt.name, action: 'set_state', params })
     } else if (stmt.kind === 'say') {
-      notes.push({ text: stmt.text })
+      // text is now a Value — extract string content where possible
+      const text = stmt.text.kind === 'string' ? stmt.text.value : '(dynamic content)'
+      notes.push({ text })
     } else if (stmt.kind === 'if') {
       // Flatten if-branch into immediate — home has no runtime conditions
       statementsToOutput(stmt.then, cmds, notes)
