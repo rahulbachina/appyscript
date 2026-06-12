@@ -3,202 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AppyScript Playground</title>
+  <title>AppyScript Playground — English-first robotics language</title>
+  <meta name="description" content="Write robot programs in plain English. AppyScript compiles to ESP32, Pico, micro:bit, Arduino and more.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0 }
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--panel:#1a1d27;--border:#2a2d3e;
+      --accent:#7c6af7;--accent2:#5eead4;
+      --text:#e2e8f0;--muted:#64748b;
+      --error:#f87171;--warn:#fbbf24;--ok:#34d399;--code:#1e2130;
+      --mono:'JetBrains Mono','Fira Code','Courier New',monospace;
+    }
+    body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
-    :root {
-      --bg:      #0f1117;
-      --panel:   #1a1d27;
-      --border:  #2a2d3e;
-      --accent:  #7c6af7;
-      --accent2: #5eead4;
-      --text:    #e2e8f0;
-      --muted:   #64748b;
-      --error:   #f87171;
-      --warn:    #fbbf24;
-      --ok:      #34d399;
-      --code:    #1e2130;
-      --mono:    'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-    }
+    /* Header */
+    header{display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;flex-wrap:wrap;gap:8px}
+    .logo{font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap}
+    .logo span{color:var(--accent2)}
+    .tagline{font-size:12px;color:var(--muted);display:none}
+    @media(min-width:640px){.tagline{display:block}}
+    .controls{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+    select{background:var(--code);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer}
+    button{padding:7px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+    button:hover{opacity:.85} button:active{opacity:.7}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-sim{background:var(--accent2);color:#0f1117}
+    .btn-share{background:var(--border);color:var(--text);font-size:12px;padding:6px 12px}
 
-    body {
-      background: var(--bg); color: var(--text);
-      font-family: system-ui, sans-serif;
-      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
-    }
+    /* Main layout */
+    main{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto;flex:1;overflow:hidden}
+    @media(max-width:700px){main{grid-template-columns:1fr;grid-template-rows:40vh 1fr auto}}
 
-    /* ── Top bar ── */
-    header {
-      display: flex; align-items: center; gap: 16px;
-      padding: 10px 20px; border-bottom: 1px solid var(--border);
-      background: var(--panel); flex-shrink: 0;
-    }
-    .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px }
-    .logo span { color: var(--accent2) }
-    .tagline { font-size: 12px; color: var(--muted); display: none }
-    @media (min-width: 600px) { .tagline { display: block } }
+    /* Editor */
+    .editor-pane{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+    .pane-label{padding:8px 16px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--panel);display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    textarea#editor{flex:1;resize:none;border:none;outline:none;background:var(--code);color:var(--text);font-family:var(--mono);font-size:14px;line-height:1.7;padding:16px;tab-size:2}
 
-    .controls { display: flex; gap: 8px; align-items: center; margin-left: auto }
+    /* Output */
+    .output-pane{display:flex;flex-direction:column;overflow:hidden}
+    .output-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0}
+    .tab{padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .tab-content{flex:1;overflow:auto;position:relative}
+    pre#output-code{font-family:var(--mono);font-size:13px;line-height:1.65;padding:16px;color:var(--text);background:var(--code);min-height:100%;white-space:pre;overflow:auto}
 
-    select {
-      background: var(--code); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 6px 10px; font-size: 13px; cursor: pointer;
-    }
+    /* Diagnostics bar */
+    #diag-panel{grid-column:1/-1;border-top:1px solid var(--border);background:var(--panel);overflow:auto;max-height:150px;flex-shrink:0}
+    .diag-row{display:flex;align-items:flex-start;gap:10px;padding:7px 16px;font-size:13px;border-bottom:1px solid var(--border)}
+    .diag-row:last-child{border-bottom:none}
+    .diag-error{color:var(--error)} .diag-warn{color:var(--warn)} .diag-hint{color:var(--accent2)}
+    .diag-ok{color:var(--ok);padding:10px 16px;font-size:13px}
+    .diag-code{font-family:var(--mono);font-size:11px;opacity:.6}
+    .diag-loc{font-family:var(--mono);font-size:11px;opacity:.5;white-space:nowrap}
 
-    button {
-      padding: 7px 16px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
-    }
-    button:hover { opacity: .85 }
-    button:active { opacity: .7 }
-    .btn-primary { background: var(--accent);  color: #fff }
-    .btn-sim     { background: var(--accent2); color: #0f1117 }
-    .btn-clear   { background: var(--border);  color: var(--text) }
+    /* Simulator */
+    #sim-panel{padding:16px;font-family:var(--mono);font-size:13px}
+    .sim-event{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--border)}
+    .sim-tick{color:var(--muted);min-width:36px}
+    .sim-type{color:var(--accent);min-width:80px}
+    .sim-state{margin-top:16px;padding:12px;background:var(--code);border-radius:8px}
+    .sim-state h3{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}
+    .sim-kv{display:flex;gap:12px;margin:3px 0;font-size:12px}
+    .sim-k{color:var(--muted);min-width:100px} .sim-v{color:var(--accent2)}
 
-    /* ── Main layout ── */
-    main {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr auto;
-      flex: 1; overflow: hidden;
-      gap: 0;
-    }
-    @media (max-width: 700px) {
-      main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr auto }
-    }
+    /* Sensor sliders */
+    #sim-controls{padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px}
+    .slider-group{display:flex;align-items:center;gap:8px}
+    .slider-group label{color:var(--muted);white-space:nowrap}
+    input[type=range]{width:80px;accent-color:var(--accent)}
+    .slider-val{color:var(--accent2);min-width:36px}
 
-    /* ── Editor ── */
-    .editor-pane {
-      display: flex; flex-direction: column;
-      border-right: 1px solid var(--border); overflow: hidden;
-    }
-    .pane-label {
-      padding: 8px 16px; font-size: 11px; font-weight: 700;
-      letter-spacing: .08em; color: var(--muted); text-transform: uppercase;
-      border-bottom: 1px solid var(--border); background: var(--panel);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .pane-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent) }
+    /* Badges */
+    .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+    .badge-ok{background:#064e3b;color:var(--ok)}
+    .badge-error{background:#450a0a;color:var(--error)}
+    .badge-warn{background:#451a03;color:var(--warn)}
 
-    textarea#editor {
-      flex: 1; resize: none; border: none; outline: none;
-      background: var(--code); color: var(--text);
-      font-family: var(--mono); font-size: 14px; line-height: 1.7;
-      padding: 16px; tab-size: 2;
-    }
+    /* Copy */
+    .copy-btn{position:absolute;top:8px;right:8px;background:var(--border);color:var(--text);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;opacity:.7}
+    .copy-btn:hover{opacity:1}
 
-    /* ── Output ── */
-    .output-pane {
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .output-tabs {
-      display: flex; border-bottom: 1px solid var(--border);
-      background: var(--panel); flex-shrink: 0;
-    }
-    .tab {
-      padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
-      color: var(--muted); border-bottom: 2px solid transparent;
-      transition: all .15s; user-select: none;
-    }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent) }
-    .tab-content { flex: 1; overflow: auto; position: relative }
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--muted);gap:8px;font-size:14px}
+    .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
-    pre#output-code {
-      font-family: var(--mono); font-size: 13px; line-height: 1.65;
-      padding: 16px; color: var(--text); background: var(--code);
-      height: 100%; overflow: auto; white-space: pre;
-    }
+    /* Explain tab */
+    #view-explain{padding:16px;font-size:14px;line-height:1.8;overflow:auto;height:100%}
+    .explain-block{padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:10px}
+    .explain-icon{color:var(--accent);flex-shrink:0}
 
-    /* ── Diagnostics ── */
-    #diag-panel {
-      grid-column: 1 / -1;
-      border-top: 1px solid var(--border);
-      background: var(--panel); overflow: auto;
-      max-height: 160px; flex-shrink: 0;
-    }
-    .diag-row {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 7px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
-    }
-    .diag-row:last-child { border-bottom: none }
-    .diag-error  { color: var(--error) }
-    .diag-warn   { color: var(--warn)  }
-    .diag-hint   { color: var(--accent2) }
-    .diag-ok     { color: var(--ok); padding: 10px 16px; font-size: 13px }
-    .diag-code   { font-family: var(--mono); font-size: 11px; opacity: .6 }
-    .diag-loc    { font-family: var(--mono); font-size: 11px; opacity: .5 }
-
-    /* ── Simulator view ── */
-    #sim-panel { padding: 16px; font-family: var(--mono); font-size: 13px }
-    .sim-event {
-      display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--border);
-    }
-    .sim-tick  { color: var(--muted); min-width: 36px }
-    .sim-type  { color: var(--accent); min-width: 80px }
-    .sim-data  { color: var(--text) }
-    .sim-state { margin-top: 16px; padding: 12px; background: var(--code); border-radius: 8px }
-    .sim-state h3 { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em }
-    .sim-kv { display: flex; gap: 12px; margin: 3px 0 }
-    .sim-k  { color: var(--muted); min-width: 100px }
-    .sim-v  { color: var(--accent2) }
-
-    /* ── Examples picker ── */
-    .examples-btn {
-      background: transparent; color: var(--muted); border: 1px solid var(--border);
-      padding: 6px 12px; font-size: 12px;
-    }
-
-    /* ── Status badge ── */
-    .badge {
-      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
-    }
-    .badge-ok    { background: #064e3b; color: var(--ok) }
-    .badge-error { background: #450a0a; color: var(--error) }
-    .badge-warn  { background: #451a03; color: var(--warn) }
-
-    /* ── Copy button ── */
-    .copy-btn {
-      position: absolute; top: 8px; right: 8px;
-      background: var(--border); color: var(--text);
-      border: none; border-radius: 4px; padding: 4px 10px;
-      font-size: 11px; cursor: pointer; opacity: .7;
-    }
-    .copy-btn:hover { opacity: 1 }
-
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100%; color: var(--muted); gap: 8px; font-size: 14px;
-    }
-    .empty-state .hint { font-size: 12px; opacity: .6 }
+    /* Share toast */
+    #toast{position:fixed;bottom:20px;right:20px;background:var(--ok);color:#064e3b;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+    #toast.show{opacity:1}
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">Appy<span>Script</span></div>
-  <div class="tagline">The English-first language for robotics</div>
+  <div class="logo">Appy<span>Script</span> <span style="font-size:12px;font-weight:400;color:var(--muted)">v1.0.0</span></div>
+  <div class="tagline">English-first language for educational robotics</div>
 
   <div class="controls">
     <select id="example-select">
       <option value="">📂 Load example...</option>
-      <option value="guard">Guard Robot</option>
-      <option value="dance">Dance Robot</option>
-      <option value="quiz">Quiz Robot</option>
-      <option value="fortune">Fortune Teller</option>
-      <option value="reaction">Reaction Game</option>
-      <option value="hello">Hello World</option>
     </select>
 
     <select id="target-select">
-      <option value="esp32">ESP32</option>
-      <option value="pico">Pico W</option>
-      <option value="microbit">micro:bit</option>
+      <option value="esp32">ESP32 / M5Stack</option>
+      <option value="pico">Raspberry Pi Pico W</option>
+      <option value="microbit">BBC micro:bit</option>
       <option value="arduino">Arduino</option>
-      <option value="circuitpython">CircuitPython</option>
+      <option value="circuitpython">Adafruit / CircuitPython</option>
     </select>
 
+    <button class="btn-share" onclick="shareProgram()">🔗 Share</button>
     <button class="btn-sim" onclick="runSimulate()">▶ Simulate</button>
     <button class="btn-primary" onclick="runCompile()">⚡ Compile</button>
   </div>
@@ -208,66 +128,126 @@
   <div class="editor-pane">
     <div class="pane-label">
       <div class="dot"></div>
-      AppyScript Source
+      AppyScript
       <span id="status-badge"></span>
+      <span style="margin-left:auto;font-size:10px;opacity:.5" id="line-count"></span>
     </div>
-    <textarea id="editor" spellcheck="false" placeholder="# Write your AppyScript here...
-# Try: Load example ↑ or start typing
-
-when button_a pressed
-  say &quot;Hello World!&quot;
-  show happy
-end"></textarea>
+    <textarea id="editor" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
   </div>
 
   <div class="output-pane">
     <div class="output-tabs">
-      <div class="tab active" onclick="switchTab('code')"   id="tab-code">Generated Code</div>
-      <div class="tab"        onclick="switchTab('sim')"    id="tab-sim">Simulation</div>
+      <div class="tab active" onclick="switchTab('code')"    id="tab-code">Generated Code</div>
+      <div class="tab"        onclick="switchTab('sim')"     id="tab-sim">Simulate</div>
       <div class="tab"        onclick="switchTab('explain')" id="tab-explain">Explain</div>
     </div>
     <div class="tab-content">
       <div id="view-code" style="height:100%;position:relative">
-        <pre id="output-code"><div class="empty-state">
-  <div>⚡ Click Compile to generate code</div>
-  <div class="hint">or ▶ Simulate to run without hardware</div>
-</div></pre>
+        <pre id="output-code"><div class="empty-state"><div class="spinner"></div><div>Loading compiler...</div></div></pre>
         <button class="copy-btn" onclick="copyCode()">Copy</button>
       </div>
-      <div id="view-sim"  style="display:none;height:100%;overflow:auto"><div id="sim-panel"></div></div>
-      <div id="view-explain" style="display:none;height:100%;overflow:auto;padding:16px;font-size:14px;line-height:1.7" id="explain-content"></div>
+      <div id="view-sim" style="display:none;height:100%;overflow:auto">
+        <div id="sim-controls">
+          <strong style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em">Sensors</strong>
+          <div class="slider-group">
+            <label>distance</label>
+            <input type="range" id="s-distance" min="0" max="200" value="80" oninput="this.nextElementSibling.textContent=this.value+'cm'">
+            <span class="slider-val">80cm</span>
+          </div>
+          <div class="slider-group">
+            <label>light</label>
+            <input type="range" id="s-light" min="0" max="100" value="60" oninput="this.nextElementSibling.textContent=this.value+'%'">
+            <span class="slider-val">60%</span>
+          </div>
+          <div class="slider-group">
+            <label>temp</label>
+            <input type="range" id="s-temp" min="-10" max="50" value="22" oninput="this.nextElementSibling.textContent=this.value+'°C'">
+            <span class="slider-val">22°C</span>
+          </div>
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="s-btn-a"> Button A
+          </label>
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="s-btn-b"> Button B
+          </label>
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="s-shaken"> Shaken
+          </label>
+        </div>
+        <div id="sim-panel"></div>
+      </div>
+      <div id="view-explain" style="display:none"></div>
     </div>
   </div>
 
   <div id="diag-panel">
-    <div class="diag-ok">Ready — write some AppyScript and click Compile or Simulate.</div>
+    <div class="diag-ok">Loading AppyScript compiler...</div>
   </div>
 </main>
 
-<script type="module">
-// Load AppyScript compiler via CDN (unpkg) in production.
-// In development: served from /dist/index.js by the dev server.
-// For the playground HTML file, we bundle the compiler inline.
+<div id="toast">🔗 Link copied to clipboard!</div>
 
-// ── Embedded minimal compiler (full compiler loaded from npm in production) ──
+<script>
+// ── Utilities ─────────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id)
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 
-// This inline version handles the core compile/simulate/explain loop.
-// Replace with:  import { compile, simulate, explain } from 'https://unpkg.com/appyscript@1.0.0/dist/index.js'
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display='none')
+  $('tab-'+name).classList.add('active')
+  $('view-'+name).style.display = 'block'
+}
 
-const EXAMPLES = {
-  hello: `when start
-  say "Hello World!"
-  show happy
-  wait 1s
-end
+// ── Compiler loading (CJS via script tag) ─────────────────────────────────────
+let compiler = null
 
-when button_a pressed
-  say "Button A pressed!"
-  show excited
-end`,
+function loadCompiler() {
+  return new Promise((resolve, reject) => {
+    if (compiler) { resolve(compiler); return }
+    // Try to load the CommonJS build as a module-like object
+    const script = document.createElement('script')
+    // GitHub Pages serves from /appyscript/ subpath; localhost from /
+    const base = location.hostname === 'localhost' ? '' : '/appyscript'
+    script.src = base + '/dist/index.js'
+    script.onload = () => {
+      // The CJS bundle exports to module.exports — we access via global
+      // For GitHub Pages we need a UMD build; use the global appyscript object
+      if (window.appyscript) { compiler = window.appyscript; resolve(compiler) }
+      else {
+        // Fallback: try require() if available (dev server with bundler)
+        reject(new Error('Compiler not available — see console for details. Try running: npm run build'))
+      }
+    }
+    script.onerror = () => reject(new Error('Failed to load compiler script'))
+    document.head.appendChild(script)
+  })
+}
 
-  guard: `when start
-  say "Guard mode on"
+// ── Build UMD bundle ──────────────────────────────────────────────────────────
+// Since the compiler is CommonJS, we need a small wrapper to expose it as a global.
+// This is created by the build step (see package.json scripts).
+// For now, we inline the API calls using dynamic evaluation.
+
+async function getCompiler() {
+  if (compiler) return compiler
+  try {
+    // Try dynamic import (works in dev with proper MIME types)
+    const base = location.hostname === 'localhost' ? '' : '/appyscript'
+    const mod = await import(base + '/dist/index.browser.js')
+    compiler = mod
+    return compiler
+  } catch(e) {
+    console.error('Import failed:', e)
+    throw new Error('Compiler could not be loaded. Make sure you ran: npm run build')
+  }
+}
+
+// ── Examples loading ──────────────────────────────────────────────────────────
+const BUILTIN_EXAMPLES = {
+  guard_robot: `when start
+  say "Guard mode active"
   show alert
 end
 
@@ -307,11 +287,12 @@ when shaken
   do wiggle
 end`,
 
-  quiz: `let score = 0
+  quiz_robot: `let score = 0
 load score
 
 when start
   say "Welcome! Score: {score}"
+  show happy
 end
 
 when button_a pressed
@@ -321,8 +302,9 @@ when button_a pressed
     save score
     say "Correct! Score: {score}"
     show excited
+    play "success"
   else
-    say "Not quite! The answer is 8"
+    say "Not quite! Answer is 8"
     show sad
   end
 end
@@ -333,7 +315,7 @@ when button_b pressed
       say "Keep practising!"
       show thinking
     case 3 to 7
-      say "Good work - score: {score}!"
+      say "Good work! Score: {score}"
       show happy
     case > 7
       say "Amazing! Score: {score}"
@@ -341,7 +323,7 @@ when button_b pressed
   end
 end`,
 
-  fortune: `let fortunes = list
+  fortune_teller: `let fortunes = list
 add "Yes, definitely!" to fortunes
 add "Ask again later" to fortunes
 add "Outlook not so good" to fortunes
@@ -349,225 +331,308 @@ add "It is certain!" to fortunes
 add "Very doubtful" to fortunes
 
 when shaken
+  show thinking
+  wait 1s
   let n = pick random 1 to 5
   let answer = item n of fortunes
   say answer
-  show thinking
-  wait 2s
   show calm
 end`,
 
-  reaction: `let best = 999
+  reaction_game: `let best = 999
 load best
 
 when start
-  say "Best time: {best}ms"
+  say "Reaction game!"
+  say "Best: {best}ms"
   show calm
 end
 
 when button_a pressed
-  let delay = pick random 2 to 6
-  wait delay
+  let delay_s = pick random 2 to 6
+  say "Get ready..."
+  show thinking
+  wait delay_s
   show alert
-  let start_ms = 0
-  wait until button_b == yes
-  say "Reaction recorded!"
+  play "alert"
+  say "NOW - press B!"
+end`,
+
+  obstacle_avoider: `when start
+  say "Obstacle avoider ON"
   show happy
+  move forward at 40%
+end
+
+forever
+  if distance < 20cm
+    stop
+    show alert
+    play "alert"
+    wait 500ms
+    move backward at 50% for 1s
+    turn right 90
+    move forward at 40%
+  end
+  wait 50ms
+end`,
+
+  hello_world: `when start
+  say "Hello World!"
+  show happy
+  wait 1s
+  say "I am a robot!"
+  show excited
+end
+
+when button_a pressed
+  say "Button A pressed!"
+  show thinking
+end
+
+when button_b pressed
+  say "Button B pressed!"
+  show calm
 end`,
 }
 
-// ── Tab switching ─────────────────────────────────────────────────────────────
-
-window.switchTab = (name) => {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-  document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none')
-  document.getElementById('tab-' + name).classList.add('active')
-  document.getElementById('view-' + name).style.display = 'block'
+function populateExamples(examples) {
+  const sel = $('example-select')
+  sel.innerHTML = '<option value="">📂 Load example...</option>'
+  const all = { ...BUILTIN_EXAMPLES, ...examples }
+  Object.keys(all).forEach(key => {
+    const opt = document.createElement('option')
+    opt.value = key
+    opt.textContent = key.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
+    sel.appendChild(opt)
+  })
+  window._examples = all
 }
 
-// ── Example loading ───────────────────────────────────────────────────────────
+async function loadExamples() {
+  try {
+    const base = location.hostname === 'localhost' ? '' : '/appyscript'
+    const res = await fetch(base + '/examples/index.json')
+    if (res.ok) {
+      const remote = await res.json()
+      populateExamples(remote)
+      return
+    }
+  } catch(e) {}
+  populateExamples({})
+}
 
-document.getElementById('example-select').addEventListener('change', (e) => {
+$('example-select').addEventListener('change', e => {
   const key = e.target.value
-  if (key && EXAMPLES[key]) {
-    document.getElementById('editor').value = EXAMPLES[key]
+  if (key && window._examples?.[key]) {
+    $('editor').value = window._examples[key]
     e.target.value = ''
+    updateLineCount()
     runCompile()
   }
 })
 
-// ── Auto-compile on edit (debounced) ─────────────────────────────────────────
+// ── URL sharing ───────────────────────────────────────────────────────────────
+function shareProgram() {
+  const code = $('editor').value
+  const encoded = btoa(unescape(encodeURIComponent(code)))
+  const url = location.origin + location.pathname + '?code=' + encoded
+  navigator.clipboard.writeText(url).then(() => {
+    const toast = $('toast')
+    toast.classList.add('show')
+    setTimeout(() => toast.classList.remove('show'), 2500)
+  })
+}
 
-let debounceTimer
-document.getElementById('editor').addEventListener('input', () => {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(runCompile, 800)
-})
+function loadFromURL() {
+  const params = new URLSearchParams(location.search)
+  const code = params.get('code')
+  if (code) {
+    try {
+      $('editor').value = decodeURIComponent(escape(atob(code)))
+      return true
+    } catch(e) {}
+  }
+  return false
+}
 
 // ── Compile ───────────────────────────────────────────────────────────────────
+let compileDebounce
+function scheduleCompile() {
+  clearTimeout(compileDebounce)
+  compileDebounce = setTimeout(runCompile, 700)
+}
 
-window.runCompile = async () => {
-  const source = document.getElementById('editor').value.trim()
+async function runCompile() {
+  const source = $('editor').value.trim()
   if (!source) return
-  const target = document.getElementById('target-select').value
+  const target = $('target-select').value
 
   try {
-    // Dynamic import from npm bundle (development: local file)
-    const { compile, explain } = await loadCompiler()
-
+    const { compile, explain } = await getCompiler()
     const result = compile(source, target)
+
     renderDiagnostics(result.diagnostics, source)
     renderBadge(result)
 
-    document.getElementById('output-code').textContent =
-      result.code || '# No code generated'
+    $('output-code').textContent = result.code || '# No code generated'
 
-    document.getElementById('view-explain').innerHTML =
-      formatExplain(explain(source))
+    const exp = explain(source)
+    $('view-explain').innerHTML = exp.split('\n').map(line =>
+      line.startsWith('•')
+        ? `<div class="explain-block"><span class="explain-icon">→</span><span>${esc(line.slice(2))}</span></div>`
+        : `<div style="color:var(--muted);font-size:12px;padding:4px 0">${esc(line)}</div>`
+    ).join('')
 
-  } catch (err) {
-    document.getElementById('output-code').textContent = '# Error: ' + err.message
-    renderDiagnostics([{ severity:'error', code:'E000', message: err.message }], source)
+  } catch(err) {
+    $('output-code').textContent = '# ' + err.message
+    renderDiagnostics([{severity:'error',code:'E000',message:err.message}], source)
+    $('status-badge').innerHTML = '<span class="badge badge-error">✖ Error</span>'
   }
 }
 
 // ── Simulate ──────────────────────────────────────────────────────────────────
-
-window.runSimulate = async () => {
-  const source = document.getElementById('editor').value.trim()
-  if (!source) return
+async function runSimulate() {
   switchTab('sim')
+  const source = $('editor').value.trim()
+  if (!source) return
+
+  $('sim-panel').innerHTML = '<div class="empty-state"><div class="spinner"></div><div>Simulating...</div></div>'
 
   try {
-    const { compile, simulate } = await loadCompiler()
-    const cResult = compile(source, 'esp32')
-    if (!cResult.ast) { renderSimError('Fix compile errors first'); return }
+    const { compile, simulate } = await getCompiler()
+    const cResult = compile(source, 'esp32', { skipLint: true })
+    if (!cResult.ast) {
+      $('sim-panel').innerHTML = `<div style="color:var(--error);padding:16px">Fix errors first:<br>${cResult.errors.map(e=>esc(e.message)).join('<br>')}</div>`
+      return
+    }
+
+    const trigEvents = []
+    if ($('s-shaken').checked) trigEvents.push('shaken')
 
     const result = simulate(cResult.ast, {
-      sensors: { distance: 25, light: 60, temperature: 22, touch: 0, acceleration: 0 },
-      buttons: {},
-      maxTicks: 30,
+      sensors: {
+        distance:    parseInt($('s-distance').value),
+        light:       parseInt($('s-light').value),
+        temperature: parseInt($('s-temp').value),
+        touch: 0, acceleration: 0,
+      },
+      buttons: { a: $('s-btn-a').checked, b: $('s-btn-b').checked },
+      triggerEvents: trigEvents,
+      maxTicks: 40,
     })
     renderSim(result)
-  } catch (err) {
-    renderSimError(err.message)
+  } catch(err) {
+    $('sim-panel').innerHTML = `<div style="color:var(--error);padding:16px">✖ ${esc(err.message)}</div>`
   }
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
-
 function renderDiagnostics(diagnostics, source) {
-  const panel = document.getElementById('diag-panel')
+  const panel = $('diag-panel')
+  const sourceLines = (source||'').split('\n')
   if (!diagnostics.length) {
     panel.innerHTML = '<div class="diag-ok">✔ No errors or warnings</div>'
     return
   }
-  const sourceLines = source.split('\n')
-  panel.innerHTML = diagnostics.map(d => {
-    const cls = `diag-${d.severity === 'error' ? 'error' : d.severity === 'warning' ? 'warn' : 'hint'}`
-    const icon = d.severity === 'error' ? '✖' : d.severity === 'warning' ? '⚠' : '●'
-    const loc = d.span ? `Line ${d.span.line}:${d.span.col}` : ''
-    const srcLine = d.span ? (sourceLines[d.span.line - 1] || '').trim() : ''
+  panel.innerHTML = diagnostics.slice(0,10).map(d => {
+    const cls = `diag-${d.severity==='error'?'error':d.severity==='warning'?'warn':'hint'}`
+    const icon = d.severity==='error'?'✖':d.severity==='warning'?'⚠':'●'
+    const loc  = d.span ? `Line ${d.span.line}` : ''
+    const hint = d.hint ? `<br><small style="opacity:.7">ℹ ${esc(d.hint)}</small>` : ''
+    const fix  = d.fix  ? `<br><small style="color:var(--ok)">💡 ${esc(d.fix.description)}</small>` : ''
     return `<div class="diag-row ${cls}">
       <span>${icon}</span>
-      <span class="diag-code">[${d.code}]</span>
-      <span style="flex:1">${escHtml(d.message)}${d.hint ? `<br><small style="opacity:.7">ℹ ${escHtml(d.hint)}</small>` : ''}</span>
+      <span class="diag-code">[${esc(d.code)}]</span>
+      <span style="flex:1">${esc(d.message)}${hint}${fix}</span>
       <span class="diag-loc">${loc}</span>
     </div>`
   }).join('')
 }
 
 function renderBadge(result) {
-  const badge = document.getElementById('status-badge')
-  if (!result.ok) {
-    badge.innerHTML = `<span class="badge badge-error">✖ ${result.errors.length} error${result.errors.length>1?'s':''}</span>`
-  } else if (result.warnings.length) {
-    badge.innerHTML = `<span class="badge badge-warn">⚠ ${result.warnings.length} warning${result.warnings.length>1?'s':''}</span>`
-  } else {
-    badge.innerHTML = `<span class="badge badge-ok">✔ OK</span>`
-  }
+  const b = $('status-badge')
+  if (!result.ok)
+    b.innerHTML = `<span class="badge badge-error">✖ ${result.errors.length} error${result.errors.length>1?'s':''}</span>`
+  else if (result.warnings.length)
+    b.innerHTML = `<span class="badge badge-warn">⚠ ${result.warnings.length} warning${result.warnings.length>1?'s':''}</span>`
+  else
+    b.innerHTML = `<span class="badge badge-ok">✔ OK</span>`
 }
 
 function renderSim(result) {
-  const panel = document.getElementById('sim-panel')
-  const events = result.events.slice(0, 50)
-
-  const evHtml = events.map(e => {
-    const detail = Object.entries(e.data).map(([k,v]) => `${k}=<b>${escHtml(String(v))}</b>`).join(' ')
+  const events = result.events.slice(0, 60)
+  const evHtml = events.length ? events.map(e => {
+    const detail = Object.entries(e.data).map(([k,v]) =>
+      `${esc(k)}=<b style="color:var(--accent2)">${esc(String(v))}</b>`
+    ).join(' ')
     return `<div class="sim-event">
       <span class="sim-tick">[${e.tick}]</span>
-      <span class="sim-type">${e.type}</span>
-      <span class="sim-data">${detail}</span>
+      <span class="sim-type">${esc(e.type)}</span>
+      <span>${detail}</span>
     </div>`
-  }).join('')
+  }).join('') : '<div style="color:var(--muted);padding:8px 0">No events — adjust sliders or check buttons above.</div>'
 
   const s = result.finalState
   const vars = [...s.variables.entries()].map(([k,v]) =>
-    `<div class="sim-kv"><span class="sim-k">${k}</span><span class="sim-v">${v}</span></div>`
+    `<div class="sim-kv"><span class="sim-k">${esc(k)}</span><span class="sim-v">${esc(String(v))}</span></div>`
   ).join('')
 
-  panel.innerHTML = `
-    <div style="color:var(--muted);font-size:12px;margin-bottom:12px">
-      ${result.success ? '✔ Simulation complete' : '✖ Simulation error'} — 
-      ${result.events.length} events, ${result.ticks} ticks
-      ${result.error ? `<br><span style="color:var(--error)">${escHtml(result.error)}</span>` : ''}
+  $('sim-panel').innerHTML = `
+    <div style="padding:12px 0 8px;font-size:12px;color:var(--muted)">
+      ${result.success?'✔':'✖'} ${result.events.length} events · ${result.ticks} ticks
+      ${result.error?`<span style="color:var(--error)"> · ${esc(result.error)}</span>`:''}
     </div>
-    ${evHtml || '<div style="color:var(--muted)">No events fired. Try pressing a button or shaking the robot.</div>'}
+    ${evHtml}
     <div class="sim-state">
-      <h3>Final state</h3>
-      <div class="sim-kv"><span class="sim-k">position</span><span class="sim-v">x=${s.position.x.toFixed(1)}, y=${s.position.y.toFixed(1)}, heading=${s.position.heading}°</span></div>
-      <div class="sim-kv"><span class="sim-k">expression</span><span class="sim-v">${s.expression}</span></div>
-      <div class="sim-kv"><span class="sim-k">display</span><span class="sim-v">${escHtml(s.displayText||'(blank)')}</span></div>
-      ${vars ? `<div class="sim-kv"><span class="sim-k">variables</span><span class="sim-v"></span></div>${vars}` : ''}
+      <h3>Final robot state</h3>
+      <div class="sim-kv"><span class="sim-k">position</span><span class="sim-v">x=${s.position.x.toFixed(1)} y=${s.position.y.toFixed(1)} heading=${s.position.heading}°</span></div>
+      <div class="sim-kv"><span class="sim-k">expression</span><span class="sim-v">${esc(s.expression)}</span></div>
+      <div class="sim-kv"><span class="sim-k">display</span><span class="sim-v">${esc(s.displayText||'(blank)')}</span></div>
+      ${vars}
     </div>
   `
 }
 
-function renderSimError(msg) {
-  document.getElementById('sim-panel').innerHTML =
-    `<div style="color:var(--error);padding:16px">✖ ${escHtml(msg)}</div>`
+function updateLineCount() {
+  const lines = $('editor').value.split('\n').length
+  $('line-count').textContent = lines + ' lines'
 }
 
-function formatExplain(text) {
-  return text.split('\n').map(line =>
-    line.startsWith('•') ? `<div style="padding:4px 0;border-bottom:1px solid var(--border)">${escHtml(line)}</div>` : escHtml(line)
-  ).join('')
-}
-
-window.copyCode = () => {
-  const code = document.getElementById('output-code').textContent
-  navigator.clipboard.writeText(code).then(() => {
+function copyCode() {
+  navigator.clipboard.writeText($('output-code').textContent).then(() => {
     const btn = document.querySelector('.copy-btn')
-    btn.textContent = 'Copied!'
-    setTimeout(() => btn.textContent = 'Copy', 1500)
+    const old = btn.textContent; btn.textContent = '✔ Copied!'
+    setTimeout(() => btn.textContent = old, 1500)
   })
 }
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-}
+// ── Event wiring ──────────────────────────────────────────────────────────────
+$('editor').addEventListener('input', () => { scheduleCompile(); updateLineCount() })
+$('target-select').addEventListener('change', runCompile)
 
-// ── Compiler loading ───────────────────────────────────────────────────────────
-// In production: loads from npm CDN
-// In development: loads from local dist/
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadExamples()
 
-let _compiler = null
-async function loadCompiler() {
-  if (_compiler) return _compiler
-  try {
-    // Try local development server first
-    _compiler = await import('/dist/index.js')
-  } catch {
-    // Fall back to CDN (set correct version on publish)
-    _compiler = await import('https://unpkg.com/appyscript@1.0.0/dist/index.js')
+  // Load code from URL share link, or default example
+  if (!loadFromURL()) {
+    $('editor').value = BUILTIN_EXAMPLES.guard_robot
   }
-  return _compiler
+  updateLineCount()
+
+  // Load compiler and first compile
+  try {
+    await getCompiler()
+    $('diag-panel').innerHTML = '<div class="diag-ok">✔ Compiler ready</div>'
+    runCompile()
+  } catch(err) {
+    $('diag-panel').innerHTML = `<div style="color:var(--error);padding:10px 16px">⚠ ${esc(err.message)}</div>`
+    $('output-code').textContent = '# Compiler not loaded\n# Run: npm run build\n# Then open this file via a local server'
+  }
 }
 
-// ── Auto-run on load ──────────────────────────────────────────────────────────
-
-document.getElementById('editor').value = EXAMPLES.guard
-setTimeout(runCompile, 300)
+init()
 </script>
 </body>
 </html>

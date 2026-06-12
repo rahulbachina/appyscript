@@ -28,7 +28,7 @@
     "appyscript": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:browser",
     "dev": "tsc --watch",
     "test": "npm run build && node --test dist/test/compiler.test.js",
     "mcp": "node dist/mcp/server.js",
@@ -36,11 +36,13 @@
     "prepublishOnly": "npm run build && npm test",
     "release:dry": "npm publish --dry-run",
     "publish:npm": "npm run build && npm test && npm publish",
-    "serve:playground": "npx serve playground -p 3000"
+    "serve:playground": "npx serve playground -p 3000",
+    "build:browser": "esbuild src/index.ts --bundle --format=esm --outfile=dist/index.browser.js --platform=browser"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.4.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
