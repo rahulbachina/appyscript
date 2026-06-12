@@ -152,6 +152,8 @@ class CircuitPythonCodegen extends BaseCodegen {
       case 'set':
         this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc)
         break
+      case 'save': this.emit(`# save ${stmt.name} — use storage module`, loc); break
+      case 'load': this.emit(`# load ${stmt.name} — use storage module`, loc); break
       case 'remember':
         this.emit(`# remember — use storage module for persistence`, loc)
         this.emit(`# import storage; storage.getmount("/").readonly = False`)

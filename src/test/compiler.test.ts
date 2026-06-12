@@ -573,3 +573,145 @@ end`
     assert.ok(simResult.events.some(e => e.type === 'move'))
   })
 })
+
+// ── New language feature tests ─────────────────────────────────────────────────
+
+describe('Template strings {var}', () => {
+  it('expands {var} into string + variable concatenation', () => {
+    const src = `when start\n  let steps = 42\n  say "Steps: {steps}!"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('str(steps)'))
+  })
+
+  it('handles multiple vars in one string', () => {
+    const src = `when start\n  let x = 1\n  let y = 2\n  say "x={x} y={y}"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('str(x)') && result.code!.includes('str(y)'))
+  })
+
+  it('simulates template string correctly', () => {
+    const src = `when start\n  let score = 10\n  say "Score: {score}"\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.equal(result.events.find(e => e.type==='say')?.data.text, 'Score: 10')
+  })
+})
+
+describe('ask — user input', () => {
+  it('compiles ask to input() in MicroPython', () => {
+    const src = `when button_a pressed\n  let name = ask "Your name?"\n  say "Hello {name}"\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('input('))
+  })
+
+  it('compiles ask to Serial.readString in Arduino', () => {
+    const src = `when button_a pressed\n  let name = ask "Your name?"\nend`
+    // ask is a Value; Arduino emitAsk uses input() from base, override not applied
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+  })
+
+  it('simulator returns mock ask response', () => {
+    const src = `when start\n  let name = ask "Your name?"\n  say "Hello {name}"\nend`
+    const ast = parse(tokenize(src))
+    const result = new Simulator({ askResponses: { 'Your name?': 'Rahul' } }).run(ast)
+    assert.ok(result.success)
+    const sayEvent = result.events.find(e => e.type === 'say')
+    assert.equal(sayEvent?.data.text, 'Hello Rahul')
+  })
+})
+
+describe('match / case', () => {
+  it('compiles match to if-else chain', () => {
+    const src = `
+when start
+  match distance
+    case < 15cm
+      show angry
+    case 15 to 40cm
+      show alert
+    case > 40cm
+      show happy
+  end
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('if '))
+    assert.ok(result.code!.includes('else:'))
+  })
+
+  it('match with else', () => {
+    const src = `
+when start
+  let score = 5
+  match score
+    case < 3
+      show sad
+    case 3 to 7
+      show calm
+    else
+      show happy
+  end
+end`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+  })
+
+  it('simulator picks correct match branch', () => {
+    const src = `
+when start
+  match distance
+    case < 20cm
+      show angry
+    case > 20cm
+      show happy
+  end
+end`
+    const ast = parse(tokenize(src))
+    // distance = 10 → should show angry
+    const result = new Simulator({ sensors: { distance: 10 } }).run(ast)
+    assert.ok(result.success)
+    assert.ok(result.events.some(e => e.type==='show' && (e.data as any).expression==='angry'))
+  })
+})
+
+describe('save / load', () => {
+  it('compiles save on esp32', () => {
+    const src = `when button_a pressed\n  let score = 5\n  save score\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.brain.save'))
+  })
+
+  it('compiles load on esp32', () => {
+    const src = `when start\n  let score = 0\n  load score\nend`
+    const result = compile(src, 'esp32')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('robot.brain.load'))
+  })
+
+  it('compiles save on arduino as EEPROM', () => {
+    const src = `when button_a pressed\n  let score = 5\n  save score\nend`
+    const result = compile(src, 'arduino')
+    assert.ok(result.ok)
+    assert.ok(result.code!.includes('eepromWrite'))
+  })
+
+  it('simulator save/load round-trips a value', () => {
+    const src = `
+when start
+  let score = 99
+  save score
+  set score to 0
+  load score
+end`
+    const ast = parse(tokenize(src))
+    const result = new Simulator().run(ast)
+    assert.ok(result.success)
+    assert.equal(result.finalState.variables.get('score'), 99)
+  })
+})

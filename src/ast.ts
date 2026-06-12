@@ -1,15 +1,12 @@
-// AppyScript AST — v3
-// Added: random, list, list_item, list_size values; list_add statement;
-//        say/show_text now accept Value (enables string + variable concatenation)
+// AppyScript AST — v4
+// New: template strings, ask, match/case, save/load
 
 export type Direction = 'forward' | 'backward' | 'left' | 'right'
-
 export type FaceExpression =
   | 'happy' | 'sad' | 'thinking' | 'excited' | 'angry'
   | 'alert' | 'sleep' | 'calm' | 'confused' | 'dizzy'
-
 export type CompareOp = '<' | '>' | '==' | '<=' | '>='
-export type ArithOp = '+' | '-' | '*' | '/'
+export type ArithOp   = '+' | '-' | '*' | '/'
 
 export interface SourceLocation { line: number; col: number }
 export interface Duration { value: number; unit: 'ms' | 's' | 'm' }
@@ -23,10 +20,11 @@ export type Value =
   | { kind: 'variable';  name: string }
   | { kind: 'sensor';    sensor: SensorName }
   | { kind: 'binary';    op: ArithOp; left: Value; right: Value }
-  | { kind: 'random';    min: Value; max: Value }          // pick random X to Y
-  | { kind: 'list' }                                        // empty list literal
-  | { kind: 'list_item'; list: string; index: Value }       // item N of listName
-  | { kind: 'list_size'; list: string }                     // size of listName
+  | { kind: 'random';    min: Value; max: Value }
+  | { kind: 'list' }
+  | { kind: 'list_item'; list: string; index: Value }
+  | { kind: 'list_size'; list: string }
+  | { kind: 'ask';       prompt: Value }            // ask "What is your name?"
 
 export type SensorName = 'distance' | 'light' | 'temperature' | 'touch' | 'acceleration'
 
@@ -60,10 +58,10 @@ export type StatementNode =
   | { kind: 'move';        direction: Direction; speed?: number; duration?: Duration }
   | { kind: 'turn';        direction: 'left' | 'right'; degrees: number }
   | { kind: 'stop' }
-  | { kind: 'say';         text: Value }          // now Value, not string
+  | { kind: 'say';         text: Value }
   | { kind: 'play';        sound: string }
   | { kind: 'show';        expression: FaceExpression }
-  | { kind: 'show_text';   text: Value }          // now Value, not string
+  | { kind: 'show_text';   text: Value }
   | { kind: 'show_number'; value: Value }
   | { kind: 'wait';        duration: Duration }
   | { kind: 'if';          condition: Condition; then: Statement[]; else?: Statement[] }
@@ -72,11 +70,13 @@ export type StatementNode =
   | { kind: 'let';         name: string; value: Value }
   | { kind: 'set';         name: string; value: Value }
   | { kind: 'remember';    name: string }
+  | { kind: 'save';        name: string }          // save score  → write to flash
+  | { kind: 'load';        name: string }          // load score  → read from flash
   | { kind: 'do';          name: string }
   | { kind: 'send';        message: Value }
-  | { kind: 'list_add';    list: string; value: Value }  // add X to listName
+  | { kind: 'list_add';    list: string; value: Value }
 
-// ── Top-level blocks ──────────────────────────────────────────────────────────
+// ── Blocks ────────────────────────────────────────────────────────────────────
 
 export type Block =
   | { kind: 'when';    trigger: Trigger; body: Statement[]; loc?: SourceLocation }
@@ -84,16 +84,3 @@ export type Block =
   | { kind: 'define';  name: string; body: Statement[]; loc?: SourceLocation }
 
 export interface Program { blocks: Block[]; source?: string }
-
-// ── Pattern matching (v2 extension) ──────────────────────────────────────────
-
-export interface MatchCase {
-  op?: CompareOp; threshold?: number; unit?: string
-  rangeFrom?: number; rangeTo?: number; rangeUnit?: string
-  body: Statement[]
-}
-
-export type MatchStatement = {
-  kind: 'match'; subject: Value; cases: MatchCase[]; else?: Statement[]
-  loc?: SourceLocation
-}

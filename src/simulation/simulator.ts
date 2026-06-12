@@ -33,6 +33,7 @@ export interface SimulationOptions {
   sensors?: Partial<Record<SensorName, number>>
   buttons?: { a?: boolean; b?: boolean }
   triggerEvents?: string[]
+  askResponses?: Record<string, string>  // mock user input for ask statements
 }
 
 function durationMs(d: Duration): number {
@@ -157,6 +158,11 @@ export class Simulator {
         break
       }
       case 'set':  this.state.variables.set(stmt.name, this.evalValue(stmt.value) as any); break
+      case 'save': this.state.memory.set(stmt.name, this.state.variables.get(stmt.name) ?? 0); break
+      case 'load': {
+        const saved = this.state.memory.get(stmt.name) ?? 0
+        this.state.variables.set(stmt.name, saved as any); break
+      }
       case 'remember': this.state.memory.set(stmt.name, this.state.variables.get(stmt.name) ?? 0); break
       case 'list_add': {
         const lst = this.state.lists.get(stmt.list) ?? []
@@ -192,6 +198,7 @@ export class Simulator {
       case 'not':      return !this.evalCond(cond.condition)
       case 'and':      return this.evalCond(cond.left) && this.evalCond(cond.right)
       case 'or':       return this.evalCond(cond.left) || this.evalCond(cond.right)
+      default: return false
     }
   }
 
@@ -208,6 +215,7 @@ export class Simulator {
         return lst[Number(this.evalValue(value.index)) - 1] ?? 0
       }
       case 'list_size': return (this.state.lists.get(value.list) ?? []).length
+      case 'ask': return this.options.askResponses?.[String(this.evalValue(value.prompt))] ?? ''
       case 'random': {
         const mn = Number(this.evalValue(value.min)), mx = Number(this.evalValue(value.max))
         return Math.floor(Math.random() * (mx - mn + 1)) + mn

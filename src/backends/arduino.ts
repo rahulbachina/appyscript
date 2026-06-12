@@ -128,6 +128,8 @@ class ArduinoCodegen extends BaseCodegen {
       case 'send':        return `robot.radioSend(String(${this.emitValue(stmt.message)}));`
       case 'let':         return `auto ${stmt.name} = ${this.emitValue(stmt.value)};`
       case 'set':         return `${stmt.name} = ${this.emitValue(stmt.value)};`
+      case 'save':        return `robot.eepromWrite(${JSON.stringify(stmt.name)}, ${stmt.name});`
+      case 'load':        return `${stmt.name} = robot.eepromRead(${JSON.stringify(stmt.name)});`
       case 'remember':    return `robot.eepromWrite(${JSON.stringify(stmt.name)}, ${stmt.name});`
       case 'list_add':    return `${stmt.list}.push_back(${this.emitValue(stmt.value)});`
       case 'do':          return `${stmt.name}();`

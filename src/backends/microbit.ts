@@ -88,6 +88,8 @@ class MicrobitCodegen extends BaseCodegen {
       case 'send':        this.emit(`radio.send(str(${this.emitValue(stmt.message)}))`, loc); break
       case 'let':         this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc); break
       case 'set':         this.emit(`${stmt.name} = ${this.emitValue(stmt.value)}`, loc); break
+      case 'save': this.emit(`# save ${stmt.name} — add storage module for persistence`, loc); break
+      case 'load': this.emit(`# load ${stmt.name} — add storage module for persistence`, loc); break
       case 'remember':    this.emit(`# remember — micro:bit uses RAM only`, loc); break
       case 'list_add':    this.emit(`${stmt.list}.append(${this.emitValue(stmt.value)})`, loc); break
       case 'do':          this.emit(this.definedFunctions.has(stmt.name) ? `${stmt.name}()` : `# Warning: '${stmt.name}' not defined`, loc); break

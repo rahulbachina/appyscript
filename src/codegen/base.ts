@@ -43,6 +43,8 @@ export abstract class BaseCodegen {
       case 'list_item': return this.emitListItem(value.list, value.index)
       case 'list_size': return this.emitListSize(value.list)
       case 'random':    return this.emitRandom(value.min, value.max)
+      case 'ask':
+        return this.emitAsk(value.prompt)
       case 'binary':
         return `(${this.emitValue(value.left)} ${value.op} ${this.emitValue(value.right)})`
     }
@@ -93,6 +95,11 @@ export abstract class BaseCodegen {
       case 'and':      return `(${this.emitCondition(cond.left)}) ${this.andKeyword()} (${this.emitCondition(cond.right)})`
       case 'or':       return `(${this.emitCondition(cond.left)}) ${this.orKeyword()} (${this.emitCondition(cond.right)})`
     }
+  }
+
+  // Override per backend for platform-appropriate input/storage
+  protected emitAsk(prompt: Value): string {
+    return `input(${this.emitStringValue(prompt)})`
   }
 
   protected boolLiteral(v: boolean): string { return v ? 'True' : 'False' }
