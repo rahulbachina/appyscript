@@ -7,6 +7,7 @@
 //   appyscript simulate <file> [--sensor-distance=50] [--button-a]
 //   appyscript list-targets
 //   appyscript list-keywords
+//   appyscript serve [--port 3001]
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -202,6 +203,14 @@ switch (command) {
     break
   }
 
+
+  case 'serve': {
+    const port = parseInt(option('port') ?? '3001')
+    const { startServer } = require('./api/server')
+    startServer(port)
+    break
+  }
+
   default: {
     console.log(`
 AppyScript v2 — The English-first robotics language
@@ -213,6 +222,7 @@ Usage:
   appyscript simulate  <file.appy> [--sensor-distance=50] [--button-a] [--shaken]
   appyscript list-targets
   appyscript list-keywords
+//   appyscript serve [--port 3001]
   appyscript skills    list | add <name> [--all] [--agent claude|cursor|codex]
 
 Targets: esp32 | arduino | pico | microbit | circuitpython

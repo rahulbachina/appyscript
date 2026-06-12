@@ -63,6 +63,7 @@ class Gen extends BaseCodegen {
       case 'shaken': return 'shaken'; case 'tilted': return `tilted${t.direction?'_'+t.direction:''}`
       case 'start': return 'start'; case 'timer': return `timer_${this.durationMs(t.interval)}ms`
       case 'received': return 'received'; case 'sensor': return `sensor_${t.sensor}`
+      default: return 'unknown'
     }
   }
 
@@ -76,6 +77,7 @@ class Gen extends BaseCodegen {
       case 'timer':    return {cond:'True', ms:this.durationMs(t.interval)}
       case 'received': return {cond:'robot.radio.received()'}
       case 'sensor':   return {cond:`${this.sensorCall(t.sensor)} ${t.op} ${t.threshold}`}
+      default: return {}
     }
   }
 

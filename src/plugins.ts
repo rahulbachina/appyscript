@@ -157,3 +157,24 @@ HARDWARE_PROFILES['home'] = {
   sensors: { distance: false, light: true, temperature: true, touch: false, acceleration: false },
   memory: { flashKB: 0, ramKB: 0 }, supportsAsync: false, hasDisplay: false, hasRadio: false,
 }
+
+HARDWARE_PROFILES['homeassistant'] = {
+  id:'homeassistant', name:'Home Assistant', runtime:'CircuitPython' as any,
+  description:'Home Assistant automation YAML. Requires HA 2023.4+.',
+  sensors:{distance:true,light:true,temperature:true,touch:false,acceleration:false},
+  memory:{flashKB:0,ramKB:0}, supportsAsync:false, hasDisplay:false, hasRadio:true,
+}
+
+HARDWARE_PROFILES['esphome'] = {
+  id:'esphome', name:'ESPHome (ESP32/ESP8266)', runtime:'CircuitPython' as any,
+  description:'ESPHome YAML config for smart home ESP32/ESP8266 devices.',
+  sensors:{distance:true,light:true,temperature:true,touch:true,acceleration:false},
+  memory:{flashKB:4096,ramKB:320}, supportsAsync:false, hasDisplay:false, hasRadio:true,
+}
+
+HARDWARE_PROFILES['nodered'] = {
+  id:'nodered', name:'Node-RED Flow', runtime:'CircuitPython' as any,
+  description:'Node-RED importable flow JSON for visual automation.',
+  sensors:{distance:false,light:false,temperature:false,touch:false,acceleration:false},
+  memory:{flashKB:0,ramKB:0}, supportsAsync:true, hasDisplay:false, hasRadio:true,
+}

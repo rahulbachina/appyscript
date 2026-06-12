@@ -919,3 +919,196 @@ end`
     }
   })
 })
+
+// ── Home Automation tests ──────────────────────────────────────────────────────
+
+describe('Home Automation language', () => {
+  const MOTION_SRC = `
+when motion detected
+  turn on lights
+  notify "Someone is home!"
+end`
+
+  const SCHEDULE_SRC = `
+when time is 22:00
+  turn off lights
+  set thermostat to 18
+  lock front_door
+end`
+
+  const FULL_HOME_SRC = `
+when motion detected in living_room
+  turn on lights in living_room
+  dim lights to 80%
+  notify "Motion in living room!"
+end
+
+when sun rises
+  scene "morning"
+  dim lights to 30%
+end
+
+when temperature > 28
+  notify "Too hot: {temperature}C"
+  set thermostat to 22
+end
+
+when door opens
+  turn on lights in hallway
+  notify "Door opened"
+end`
+
+  it('parses motion trigger', () => {
+    const ast = parse(tokenize(MOTION_SRC))
+    assert.equal(ast.blocks.length, 1)
+    const block = ast.blocks[0]
+    assert.ok(block.kind === 'when')
+    assert.equal(block.trigger.kind, 'motion')
+  })
+
+  it('parses lights on/off/dim statements', () => {
+    const ast = parse(tokenize(MOTION_SRC))
+    const block = ast.blocks[0]
+    assert.ok(block.kind === 'when')
+    assert.ok(block.body.some(s => s.kind === 'lights_on'))
+    assert.ok(block.body.some(s => s.kind === 'notify'))
+  })
+
+  it('parses time trigger HH:MM', () => {
+    const ast = parse(tokenize(SCHEDULE_SRC))
+    const block = ast.blocks[0]
+    assert.ok(block.kind === 'when' && block.trigger.kind === 'time_of_day')
+    if (block.kind === 'when' && block.trigger.kind === 'time_of_day') {
+      assert.equal(block.trigger.hour, 22)
+      assert.equal(block.trigger.minute, 0)
+    }
+  })
+
+  it('parses thermostat and lock statements', () => {
+    const ast = parse(tokenize(SCHEDULE_SRC))
+    const block = ast.blocks[0]
+    assert.ok(block.kind === 'when')
+    assert.ok(block.body.some(s => s.kind === 'thermostat'))
+    assert.ok(block.body.some(s => s.kind === 'lock'))
+  })
+
+  it('compiles to Home Assistant YAML', () => {
+    const result = compile(FULL_HOME_SRC, 'homeassistant')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('platform:'))
+    assert.ok(result.code!.includes('service: light.turn_on'))
+    assert.ok(result.code!.includes('service: notify.notify'))
+    assert.ok(result.code!.includes('service: climate.set_temperature'))
+  })
+
+  it('compiles to ESPHome YAML', () => {
+    const result = compile(MOTION_SRC, 'esphome')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    assert.ok(result.code!.includes('esphome:'))
+    assert.ok(result.code!.includes('esp32:'))
+    assert.ok(result.code!.includes('binary_sensor:'))
+  })
+
+  it('compiles to Node-RED JSON', () => {
+    const result = compile(MOTION_SRC, 'nodered')
+    assert.ok(result.ok, result.errors.map(e=>e.message).join(', '))
+    const flows = JSON.parse(result.code!)
+    assert.ok(Array.isArray(flows))
+    assert.ok(flows.some((n:any) => n.type === 'function'))
+  })
+
+  it('home programs still compile to robot targets', () => {
+    // Existing robot programs unaffected
+    const src = `when button_a pressed\n  move forward at 50% for 2s\nend`
+    for (const target of ['esp32','pico','microbit','arduino']) {
+      const result = compile(src, target)
+      assert.ok(result.ok, `${target}: ${result.errors.map(e=>e.message).join(', ')}`)
+    }
+  })
+
+  it('Home Assistant output is valid YAML structure', () => {
+    const result = compile(FULL_HOME_SRC, 'homeassistant')
+    assert.ok(result.ok)
+    // Check YAML has automation alias and trigger
+    assert.ok(result.code!.includes('- alias:'))
+    assert.ok(result.code!.includes('trigger:'))
+    assert.ok(result.code!.includes('action:'))
+  })
+})
+
+describe('REST API', () => {
+  it('OpenAPI spec is valid JSON', () => {
+    const { openApiSpec } = require('../api/openapi')
+    assert.equal(openApiSpec.openapi, '3.0.3')
+    assert.ok(openApiSpec.paths['/api/compile'])
+    assert.ok(openApiSpec.paths['/api/simulate'])
+    assert.ok(openApiSpec.paths['/api/validate'])
+    assert.ok(openApiSpec.components.schemas.CompileRequest)
+  })
+
+  it('can start and respond to health check', async () => {
+    const { startServer } = require('../api/server')
+    const server = startServer(0)   // port 0 = OS assigns free port
+    const port: number = (server.address() as any).port
+
+    const res = await fetch(`http://localhost:${port}/api/health`)
+    const data = await res.json()
+    assert.equal(res.status, 200)
+    assert.equal(data.status, 'ok')
+    server.close()
+  })
+
+  it('API compiles via HTTP POST', async () => {
+    const { startServer } = require('../api/server')
+    const server = startServer(0)
+    const port: number = (server.address() as any).port
+
+    const res = await fetch(`http://localhost:${port}/api/compile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'when button_a pressed\n  show happy\nend', target: 'esp32' }),
+    })
+    const data = await res.json()
+    assert.equal(res.status, 200)
+    assert.equal(data.ok, true)
+    assert.ok(data.code.includes('asyncio'))
+    server.close()
+  })
+
+  it('API validates and returns errors', async () => {
+    const { startServer } = require('../api/server')
+    const server = startServer(0)
+    const port: number = (server.address() as any).port
+
+    const res = await fetch(`http://localhost:${port}/api/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'when button_a pressed\n  do nonexistent\nend' }),
+    })
+    const data = await res.json()
+    assert.equal(data.valid, false)
+    assert.ok(data.errors.length > 0)
+    assert.ok(data.errors[0].message.includes('nonexistent'))
+    server.close()
+  })
+
+  it('API simulates program via HTTP', async () => {
+    const { startServer } = require('../api/server')
+    const server = startServer(0)
+    const port: number = (server.address() as any).port
+
+    const res = await fetch(`http://localhost:${port}/api/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'when distance < 30cm\n  show angry\nend',
+        sensors: { distance: 20 },
+        maxTicks: 2,
+      }),
+    })
+    const data = await res.json()
+    assert.equal(data.success, true)
+    assert.ok(data.events.some((e:any) => e.type === 'show'))
+    server.close()
+  })
+})

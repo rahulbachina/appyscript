@@ -13,6 +13,9 @@ import { arduinoBackend } from './backends/arduino'
 import { microbitBackend } from './backends/microbit'
 import { picoBackend }    from './backends/pico'
 import { circuitpythonBackend } from './backends/circuitpython'
+import { homeassistantBackend } from './backends/homeassistant'
+import { esphomeBackend }       from './backends/esphome'
+import { noderedBackend }       from './backends/nodered'
 import { homeBackend } from './backends/home'
 import type { SourceMap } from './sourcemap'
 import type { Program } from './ast'
@@ -24,6 +27,9 @@ registry.register(microbitBackend)
 registry.register(picoBackend)
 registry.register(circuitpythonBackend)
 registry.register(homeBackend)
+registry.register(homeassistantBackend)
+registry.register(esphomeBackend)
+registry.register(noderedBackend)
 
 // Home hardware profile (virtual — no chip)
 HARDWARE_PROFILES['home'] = {

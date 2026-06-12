@@ -1,5 +1,5 @@
-// AppyScript AST — v5 (final)
-// New: wait_until, stop_all statements; round, abs, min, max, length values
+// AppyScript AST — v6
+// Added: home automation triggers + statements (motion, door, time, sun, lights, thermostat, lock, notify, scene)
 
 export type Direction = 'forward' | 'backward' | 'left' | 'right'
 export type FaceExpression =
@@ -24,25 +24,32 @@ export type Value =
   | { kind: 'list_item'; list: string; index: Value }
   | { kind: 'list_size'; list: string }
   | { kind: 'ask';       prompt: Value }
-  | { kind: 'round';     value: Value }               // round distance  → 42
-  | { kind: 'abs';       value: Value }               // abs -5          → 5
-  | { kind: 'min';       left: Value; right: Value }  // min of x and y
-  | { kind: 'max';       left: Value; right: Value }  // max of x and y
-  | { kind: 'length';    value: Value }               // length of name  → 5
+  | { kind: 'round';     value: Value }
+  | { kind: 'abs';       value: Value }
+  | { kind: 'min';       left: Value; right: Value }
+  | { kind: 'max';       left: Value; right: Value }
+  | { kind: 'length';    value: Value }
 
 export type SensorName = 'distance' | 'light' | 'temperature' | 'touch' | 'acceleration'
 
 // ── Triggers ──────────────────────────────────────────────────────────────────
 
 export type Trigger =
+  // Robot triggers
   | { kind: 'button_a' }
   | { kind: 'button_b' }
   | { kind: 'shaken' }
-  | { kind: 'tilted'; direction?: Direction }
+  | { kind: 'tilted';   direction?: Direction }
   | { kind: 'start' }
-  | { kind: 'timer'; interval: Duration }
+  | { kind: 'timer';    interval: Duration }
   | { kind: 'received'; variable?: string }
-  | { kind: 'sensor'; sensor: SensorName; op: CompareOp; threshold: number; unit?: string }
+  | { kind: 'sensor';   sensor: SensorName; op: CompareOp; threshold: number; unit?: string }
+  // Home automation triggers
+  | { kind: 'motion';   room?: string }
+  | { kind: 'door';     event: 'opens' | 'closes'; door?: string }
+  | { kind: 'presence'; event: 'arrives' | 'leaves'; person?: string }
+  | { kind: 'time_of_day'; hour: number; minute: number }
+  | { kind: 'sun';      event: 'rises' | 'sets' }
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -59,17 +66,18 @@ export type Condition =
 export type Statement = StatementNode & { loc?: SourceLocation }
 
 export type StatementNode =
+  // Robot actions
   | { kind: 'move';        direction: Direction; speed?: number; duration?: Duration }
   | { kind: 'turn';        direction: 'left' | 'right'; degrees: number }
   | { kind: 'stop' }
-  | { kind: 'stop_all' }                              // stop all  → emergency stop
+  | { kind: 'stop_all' }
   | { kind: 'say';         text: Value }
   | { kind: 'play';        sound: string }
   | { kind: 'show';        expression: FaceExpression }
   | { kind: 'show_text';   text: Value }
   | { kind: 'show_number'; value: Value }
   | { kind: 'wait';        duration: Duration }
-  | { kind: 'wait_until';  condition: Condition }     // wait until distance < 30cm
+  | { kind: 'wait_until';  condition: Condition }
   | { kind: 'if';          condition: Condition; then: Statement[]; else?: Statement[] }
   | { kind: 'repeat';      count: Value; body: Statement[] }
   | { kind: 'while';       condition: Condition; body: Statement[] }
@@ -81,6 +89,16 @@ export type StatementNode =
   | { kind: 'do';          name: string }
   | { kind: 'send';        message: Value }
   | { kind: 'list_add';    list: string; value: Value }
+  // Home automation actions
+  | { kind: 'lights_on';   room?: string; brightness?: number }
+  | { kind: 'lights_off';  room?: string }
+  | { kind: 'lights_dim';  room?: string; level: Value }
+  | { kind: 'thermostat';  temperature: Value }
+  | { kind: 'lock';        device?: string }
+  | { kind: 'unlock';      device?: string }
+  | { kind: 'scene';       name: string }
+  | { kind: 'notify';      message: Value }
+  | { kind: 'set_device';  device: string; state: Value }
 
 // ── Blocks ────────────────────────────────────────────────────────────────────
 
