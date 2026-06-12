@@ -1,16 +1,12 @@
-// AppyScript BaseCodegen — v3
-// Added: emitValue for random/list/list_item/list_size, emitStringValue for say/show
+// AppyScript BaseCodegen — v5 (final)
 
 import type { Program, Value, Condition, Duration, SensorName, FaceExpression } from '../ast'
 import { SourceMap } from '../sourcemap'
 import type { HardwareProfile, GenerateResult } from '../plugins'
 
 export function durationMs(d: Duration): number {
-  if (d.unit === 'ms') return d.value
-  if (d.unit === 's')  return d.value * 1000
-  return d.value * 60000
+  return d.unit==='ms' ? d.value : d.unit==='s' ? d.value*1000 : d.value*60000
 }
-export function durationS(d: Duration): number { return durationMs(d) / 1000 }
 
 export abstract class BaseCodegen {
   protected lines: string[] = []
@@ -21,125 +17,113 @@ export abstract class BaseCodegen {
   protected abstract sensorCall(sensor: SensorName): string
   abstract generate(program: Program, profile: HardwareProfile): GenerateResult
 
-  protected emit(line: string, sourceLine?: number) {
-    if (sourceLine !== undefined) this.sourceMap.record(this.lines.length + 1, sourceLine)
+  protected emit(line: string, srcLine?: number) {
+    if (srcLine !== undefined) this.sourceMap.record(this.lines.length+1, srcLine)
     this.lines.push('    '.repeat(this.indentLevel) + line)
   }
-
-  protected emitBlank()  { this.lines.push('') }
-  protected indent()     { this.indentLevel++ }
-  protected dedent()     { this.indentLevel = Math.max(0, this.indentLevel - 1) }
+  protected emitBlank() { this.lines.push('') }
+  protected indent()    { this.indentLevel++ }
+  protected dedent()    { this.indentLevel = Math.max(0, this.indentLevel-1) }
+  protected durationMs(d: Duration) { return durationMs(d) }
 
   // ── Values ────────────────────────────────────────────────────────────────────
 
-  protected emitValue(value: Value): string {
-    switch (value.kind) {
-      case 'number':    return String(value.value)
-      case 'string':    return JSON.stringify(value.value)
-      case 'bool':      return this.boolLiteral(value.value)
-      case 'variable':  return value.name
-      case 'sensor':    return this.sensorCall(value.sensor)
-      case 'list':      return this.emitListLiteral()
-      case 'list_item': return this.emitListItem(value.list, value.index)
-      case 'list_size': return this.emitListSize(value.list)
-      case 'random':    return this.emitRandom(value.min, value.max)
-      case 'ask':
-        return this.emitAsk(value.prompt)
-      case 'binary':
-        return `(${this.emitValue(value.left)} ${value.op} ${this.emitValue(value.right)})`
+  protected emitValue(v: Value): string {
+    switch (v.kind) {
+      case 'number':    return String(v.value)
+      case 'string':    return JSON.stringify(v.value)
+      case 'bool':      return this.boolLit(v.value)
+      case 'variable':  return v.name
+      case 'sensor':    return this.sensorCall(v.sensor)
+      case 'list':      return this.listLiteral()
+      case 'list_item': return `${v.list}[${this.emitValue(v.index)} - 1]`
+      case 'list_size': return `len(${v.list})`
+      case 'ask':       return `input(${this.emitStr(v.prompt)})`
+      case 'round':     return `round(${this.emitValue(v.value)})`
+      case 'abs':       return `abs(${this.emitValue(v.value)})`
+      case 'min':       return `min(${this.emitValue(v.left)}, ${this.emitValue(v.right)})`
+      case 'max':       return `max(${this.emitValue(v.left)}, ${this.emitValue(v.right)})`
+      case 'length':    return `len(str(${this.emitValue(v.value)}))`
+      case 'random':    return `random.randint(${this.emitValue(v.min)}, ${this.emitValue(v.max)})`
+      case 'binary':    return `(${this.emitValue(v.left)} ${v.op} ${this.emitValue(v.right)})`
     }
   }
 
-  /** Emit a value coerced to a string — for say/show_text */
-  protected emitStringValue(value: Value): string {
-    if (value.kind === 'string')  return JSON.stringify(value.value)
-    if (value.kind === 'number')  return JSON.stringify(String(value.value))
-    // Concatenation: "text" + variable → str(text) + str(var)
-    if (value.kind === 'binary' && value.op === '+') {
-      return `${this.strCast(this.emitStringValue(value.left))} + ${this.strCast(this.emitStringValue(value.right))}`
-    }
-    return this.strCast(this.emitValue(value))
+  // String-context emission: wraps non-strings in str()
+  protected emitStr(v: Value): string {
+    if (v.kind==='string') return JSON.stringify(v.value)
+    if (v.kind==='binary' && v.op==='+')
+      return `${this.wrapStr(this.emitStr(v.left))} + ${this.wrapStr(this.emitStr(v.right))}`
+    return this.wrapStr(this.emitValue(v))
   }
+  protected wrapStr(s: string)    { return `str(${s})` }
+  protected wrapStrCpp(s: string) { return `String(${s})` }
 
-  /** Same but for Arduino (String() instead of str()) */
-  protected emitStringValueCpp(value: Value): string {
-    if (value.kind === 'string')  return JSON.stringify(value.value)
-    if (value.kind === 'number')  return `String(${value.value})`
-    if (value.kind === 'binary' && value.op === '+') {
-      return `${this.strCastCpp(this.emitStringValueCpp(value.left))} + ${this.strCastCpp(this.emitStringValueCpp(value.right))}`
-    }
-    return this.strCastCpp(this.emitValue(value))
-  }
-
-  protected strCast(v: string):    string { return `str(${v})` }
-  protected strCastCpp(v: string): string { return `String(${v})` }
-
-  // Override per-backend
-  protected emitListLiteral(): string    { return '[]' }
-  protected emitListItem(list: string, index: Value): string {
-    return `${list}[${this.emitValue(index)} - 1]`   // 1-indexed in AppyScript
-  }
-  protected emitListSize(list: string): string { return `len(${list})` }
-  protected emitRandom(min: Value, max: Value): string {
-    return `random.randint(${this.emitValue(min)}, ${this.emitValue(max)})`
+  // For say/show_text in Arduino
+  protected emitStrCpp(v: Value): string {
+    if (v.kind==='string') return JSON.stringify(v.value)
+    if (v.kind==='binary' && v.op==='+')
+      return `${this.wrapStrCpp(this.emitStrCpp(v.left))} + ${this.wrapStrCpp(this.emitStrCpp(v.right))}`
+    return this.wrapStrCpp(this.emitValue(v))
   }
 
   // ── Conditions ────────────────────────────────────────────────────────────────
 
-  protected emitCondition(cond: Condition): string {
-    switch (cond.kind) {
-      case 'sensor':   return `${this.sensorCall(cond.sensor)} ${cond.op} ${cond.threshold}`
-      case 'variable': return `${cond.name} ${cond.op} ${this.emitValue(cond.value)}`
-      case 'bool':     return this.boolLiteral(cond.value)
-      case 'not':      return `${this.notKeyword()}(${this.emitCondition(cond.condition)})`
-      case 'and':      return `(${this.emitCondition(cond.left)}) ${this.andKeyword()} (${this.emitCondition(cond.right)})`
-      case 'or':       return `(${this.emitCondition(cond.left)}) ${this.orKeyword()} (${this.emitCondition(cond.right)})`
+  protected emitCond(c: Condition): string {
+    switch (c.kind) {
+      case 'sensor':   return `${this.sensorCall(c.sensor)} ${c.op} ${c.threshold}`
+      case 'variable': return `${c.name} ${c.op} ${this.emitValue(c.value)}`
+      case 'bool':     return this.boolLit(c.value)
+      case 'not':      return `${this.notKw()}(${this.emitCond(c.condition)})`
+      case 'and':      return `(${this.emitCond(c.left)}) ${this.andKw()} (${this.emitCond(c.right)})`
+      case 'or':       return `(${this.emitCond(c.left)}) ${this.orKw()} (${this.emitCond(c.right)})`
     }
   }
 
-  // Override per backend for platform-appropriate input/storage
-  protected emitAsk(prompt: Value): string {
-    return `input(${this.emitStringValue(prompt)})`
+  // Override in C++ backends
+  protected boolLit(_v: boolean): string { return _v ? 'True' : 'False' }
+  protected notKw()  { return 'not ' }
+  protected andKw()  { return 'and' }
+  protected orKw()   { return 'or' }
+  protected listLiteral() { return '[]' }
+
+  // ── wait_until helpers (one per runtime style) ────────────────────────────────
+
+  // MicroPython async (ESP32, Pico)
+  protected emitWaitUntilAsync(condition: Condition, loc?: number) {
+    this.emit(`while not (${this.emitCond(condition)}):`, loc)
+    this.indent(); this.emit('await asyncio.sleep_ms(50)'); this.dedent()
   }
 
-  protected boolLiteral(v: boolean): string { return v ? 'True' : 'False' }
-  protected notKeyword(): string { return 'not ' }
-  protected andKeyword(): string { return 'and' }
-  protected orKeyword():  string { return 'or' }
+  // MicroPython sync (micro:bit, CircuitPython)
+  protected emitWaitUntilSync(condition: Condition, loc?: number) {
+    this.emit(`while not (${this.emitCond(condition)}):`, loc)
+    this.indent(); this.emit('sleep(50)'); this.dedent()
+  }
 
-  // ── Utilities ─────────────────────────────────────────────────────────────────
+  // Arduino C++
+  protected emitWaitUntilCpp(condition: Condition, loc?: number) {
+    this.emit(`while (!(${this.emitCond(condition)})) {`, loc)
+    this.indent(); this.emit('delay(50);'); this.dedent(); this.emit('}')
+  }
 
-  protected durationMs(d: Duration): number { return durationMs(d) }
-  protected durationS(d: Duration):  number { return durationS(d) }
+  // ── Boilerplate ───────────────────────────────────────────────────────────────
 
-  protected emitHeader(targetLabel: string, runtime: string) {
+  protected emitHeader(target: string, runtime: string) {
     this.emit(`# Generated by AppyScript — https://github.com/rahulbachina/appyscript`)
-    this.emit(`# Target: ${targetLabel} (${runtime})`)
-    this.emit(`# Do not edit — re-generate from your .appy source file`)
-    this.emitBlank()
+    this.emit(`# Target: ${target} (${runtime})`); this.emitBlank()
   }
-
-  protected emitCHeader(targetLabel: string) {
+  protected emitCHeader(target: string) {
     this.emit(`// Generated by AppyScript — https://github.com/rahulbachina/appyscript`)
-    this.emit(`// Target: ${targetLabel} (Arduino C++)`)
-    this.emit(`// Do not edit — re-generate from your .appy source file`)
-    this.emitBlank()
+    this.emit(`// Target: ${target} (Arduino C++)`); this.emitBlank()
   }
-
   protected result(): GenerateResult {
-    return { code: this.lines.join('\n'), sourceMap: this.sourceMap.size > 0 ? this.sourceMap : undefined }
+    return { code:this.lines.join('\n'), sourceMap:this.sourceMap.size>0?this.sourceMap:undefined }
   }
-}
-
-export const ASCII_FACES: Record<FaceExpression, string> = {
-  happy:'(^_^)', sad:'(T_T)', thinking:'(o_o)', excited:'\\(^o^)/',
-  angry:'(>_<)', alert:'(!_!)', sleep:'(-_-)zzz', calm:'(~_~)',
-  confused:'(?_?)', dizzy:'(@_@)',
 }
 
 export const MICROBIT_IMAGES: Record<FaceExpression, string> = {
   happy:'Image.HAPPY', sad:'Image.SAD', thinking:'Image.SURPRISED',
   excited:'Image.YES', angry:'Image.ANGRY', alert:'Image.SURPRISED',
-  sleep:'Image.ASLEEP', calm:'Image.CALM', confused:'Image.CONFUSED',
-  dizzy:'Image.ROLL',
+  sleep:'Image.ASLEEP', calm:'Image.CALM', confused:'Image.CONFUSED', dizzy:'Image.ROLL',
 }

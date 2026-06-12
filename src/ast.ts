@@ -1,5 +1,5 @@
-// AppyScript AST — v4
-// New: template strings, ask, match/case, save/load
+// AppyScript AST — v5 (final)
+// New: wait_until, stop_all statements; round, abs, min, max, length values
 
 export type Direction = 'forward' | 'backward' | 'left' | 'right'
 export type FaceExpression =
@@ -7,7 +7,6 @@ export type FaceExpression =
   | 'alert' | 'sleep' | 'calm' | 'confused' | 'dizzy'
 export type CompareOp = '<' | '>' | '==' | '<=' | '>='
 export type ArithOp   = '+' | '-' | '*' | '/'
-
 export interface SourceLocation { line: number; col: number }
 export interface Duration { value: number; unit: 'ms' | 's' | 'm' }
 
@@ -24,7 +23,12 @@ export type Value =
   | { kind: 'list' }
   | { kind: 'list_item'; list: string; index: Value }
   | { kind: 'list_size'; list: string }
-  | { kind: 'ask';       prompt: Value }            // ask "What is your name?"
+  | { kind: 'ask';       prompt: Value }
+  | { kind: 'round';     value: Value }               // round distance  → 42
+  | { kind: 'abs';       value: Value }               // abs -5          → 5
+  | { kind: 'min';       left: Value; right: Value }  // min of x and y
+  | { kind: 'max';       left: Value; right: Value }  // max of x and y
+  | { kind: 'length';    value: Value }               // length of name  → 5
 
 export type SensorName = 'distance' | 'light' | 'temperature' | 'touch' | 'acceleration'
 
@@ -58,20 +62,22 @@ export type StatementNode =
   | { kind: 'move';        direction: Direction; speed?: number; duration?: Duration }
   | { kind: 'turn';        direction: 'left' | 'right'; degrees: number }
   | { kind: 'stop' }
+  | { kind: 'stop_all' }                              // stop all  → emergency stop
   | { kind: 'say';         text: Value }
   | { kind: 'play';        sound: string }
   | { kind: 'show';        expression: FaceExpression }
   | { kind: 'show_text';   text: Value }
   | { kind: 'show_number'; value: Value }
   | { kind: 'wait';        duration: Duration }
+  | { kind: 'wait_until';  condition: Condition }     // wait until distance < 30cm
   | { kind: 'if';          condition: Condition; then: Statement[]; else?: Statement[] }
   | { kind: 'repeat';      count: Value; body: Statement[] }
   | { kind: 'while';       condition: Condition; body: Statement[] }
   | { kind: 'let';         name: string; value: Value }
   | { kind: 'set';         name: string; value: Value }
   | { kind: 'remember';    name: string }
-  | { kind: 'save';        name: string }          // save score  → write to flash
-  | { kind: 'load';        name: string }          // load score  → read from flash
+  | { kind: 'save';        name: string }
+  | { kind: 'load';        name: string }
   | { kind: 'do';          name: string }
   | { kind: 'send';        message: Value }
   | { kind: 'list_add';    list: string; value: Value }
