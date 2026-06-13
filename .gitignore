@@ -1,2 +1,9 @@
 node_modules
 dist
+
+# Generated compilation artifacts (examples are .appy source only)
+examples/*.py
+examples/*.ino
+examples/*.yaml
+examples/*.json
+!examples/index.json

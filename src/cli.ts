@@ -70,10 +70,23 @@ switch (command) {
     }
 
     if (result.ok && result.code) {
-      const outFile = file.replace(/\.appy$/, `.${target === 'arduino' ? 'ino' : 'py'}`)
+      const ext: Record<string, string> = {
+        arduino: 'ino',
+        esp32: 'py', pico: 'py', microbit: 'py', circuitpython: 'py',
+        homeassistant: 'yaml', esphome: 'yaml',
+        nodered: 'json', home: 'json',
+      }
+      const outFile = file.replace(/\.appy$/, `.${ext[target] ?? 'txt'}`)
       fs.writeFileSync(outFile, result.code)
       console.log(`\n✔ Compiled → ${outFile}`)
-      console.log(`  ${result.code.split('\n').length} lines of ${target === 'arduino' ? 'C++' : 'MicroPython'}`)
+      const langLabel: Record<string, string> = {
+        arduino: 'C++',
+        esp32: 'MicroPython', pico: 'MicroPython', microbit: 'MicroPython',
+        circuitpython: 'CircuitPython',
+        homeassistant: 'Home Assistant YAML', esphome: 'ESPHome YAML',
+        nodered: 'Node-RED JSON', home: 'JSON',
+      }
+      console.log(`  ${result.code.split('\n').length} lines of ${langLabel[target] ?? 'code'}`)
 
       if (withMap && result.sourceMap) {
         const mapFile = outFile + '.map'

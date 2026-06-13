@@ -27,7 +27,7 @@ class Gen extends BaseCodegen {
     for (const b of defines) {
       if (b.kind!=='define') continue
       this.definedFunctions.add(b.name)
-      this.emit(`def ${b.name}():`,b.loc?.line); this.indent(); this.stmts(b.body); this.dedent(); this.emitBlank()
+      this.emit(`async def ${b.name}():`,b.loc?.line); this.indent(); this.stmts(b.body); this.dedent(); this.emitBlank()
     }
     for (const b of whens) { if (b.kind==='when') this.handler(b) }
     for (const b of forevers) {
@@ -111,7 +111,7 @@ class Gen extends BaseCodegen {
       case 'save':       this.emit(`robot.nvm.save(${JSON.stringify(s.name)}, ${s.name})`,l); break
       case 'load':       this.emit(`${s.name} = robot.nvm.load(${JSON.stringify(s.name)}, 0)`,l); break
       case 'list_add':   this.emit(`${s.list}.append(${this.emitValue(s.value)})`,l); break
-      case 'do':         this.emit(this.definedFunctions.has(s.name)?`${s.name}()`:`# '${s.name}' not defined`,l); break
+      case 'do':         this.emit(this.definedFunctions.has(s.name)?`await ${s.name}()`:`# '${s.name}' not defined`,l); break
       case 'if':
         this.emit(`if ${this.emitCond(s.condition)}:`,l); this.indent(); this.stmts(s.then); this.dedent()
         if (s.else) { this.emit('else:'); this.indent(); this.stmts(s.else); this.dedent() }; break

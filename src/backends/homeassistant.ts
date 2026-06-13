@@ -12,19 +12,42 @@ function yamlStr(s: string): string {
   return s.includes("'") ? `"${s}"` : `'${s}'`
 }
 
-function emitValue(v: Value): string {
+// Produce a bare Jinja2 expression (NO surrounding {{ }}).
+function jinjaExpr(v: Value): string {
   switch(v.kind) {
     case 'number':   return String(v.value)
-    case 'string':   return yamlStr(v.value)
+    case 'string':   return `'${v.value.replace(/'/g, "\\'")}'`
     case 'bool':     return v.value ? 'true' : 'false'
-    case 'variable': return `{{ ${v.name} }}`
-    case 'sensor':   return `{{ states('sensor.${v.sensor}') | float }}`
-    case 'binary':   return `{{ (${emitValue(v.left)}) ${v.op} (${emitValue(v.right)}) }}`
-    case 'random':   return `{{ range(${emitValue(v.min)}, ${emitValue(v.max)}) | random }}`
-    case 'round':    return `{{ (${emitValue(v.value)}) | round }}`
-    case 'abs':      return `{{ (${emitValue(v.value)}) | abs }}`
-    default:         return yamlStr(String((v as any).kind))
+    case 'variable': return v.name
+    case 'sensor':   return `states('sensor.${v.sensor}') | float`
+    case 'binary': {
+      // String concatenation uses ~ in Jinja2; arithmetic uses the operator
+      const op = v.op === '+' && (isStringy(v.left) || isStringy(v.right)) ? '~' : v.op
+      return `(${jinjaExpr(v.left)} ${op} ${jinjaExpr(v.right)})`
+    }
+    case 'random':   return `range(${jinjaExpr(v.min)}, ${jinjaExpr(v.max)}) | random`
+    case 'round':    return `(${jinjaExpr(v.value)}) | round`
+    case 'abs':      return `(${jinjaExpr(v.value)}) | abs`
+    case 'min':      return `[${jinjaExpr(v.left)}, ${jinjaExpr(v.right)}] | min`
+    case 'max':      return `[${jinjaExpr(v.left)}, ${jinjaExpr(v.right)}] | max`
+    case 'length':   return `(${jinjaExpr(v.value)}) | string | length`
+    default:         return '0'
   }
+}
+
+function isStringy(v: Value): boolean {
+  if (v.kind === 'string') return true
+  if (v.kind === 'binary' && v.op === '+') return isStringy(v.left) || isStringy(v.right)
+  return false
+}
+
+// A value used where HA expects a literal/templated scalar.
+// Plain literals stay plain; anything dynamic gets wrapped in {{ }} once.
+function emitValue(v: Value): string {
+  if (v.kind === 'number') return String(v.value)
+  if (v.kind === 'string') return yamlStr(v.value)
+  if (v.kind === 'bool')   return v.value ? 'true' : 'false'
+  return `"{{ ${jinjaExpr(v)} }}"`
 }
 
 function emitConditionYaml(cond: Condition, ind: number): string {
@@ -32,7 +55,7 @@ function emitConditionYaml(cond: Condition, ind: number): string {
     case 'sensor':
       return `${'  '.repeat(ind)}- condition: numeric_state\n${'  '.repeat(ind+1)}entity_id: sensor.${cond.sensor}\n${'  '.repeat(ind+1)}${cond.op==='<'?'below':'above'}: ${cond.threshold}`
     case 'variable':
-      return `${'  '.repeat(ind)}- condition: template\n${'  '.repeat(ind+1)}value_template: >-\n${'  '.repeat(ind+2)}{{ ${cond.name} ${cond.op} ${emitValue(cond.value)} }}`
+      return `${'  '.repeat(ind)}- condition: template\n${'  '.repeat(ind+1)}value_template: >-\n${'  '.repeat(ind+2)}{{ ${cond.name} ${cond.op} ${jinjaExpr(cond.value)} }}`
     case 'bool':
       return cond.value ? '' : `${'  '.repeat(ind)}- condition: template\n${'  '.repeat(ind+1)}value_template: 'false'`
     case 'not':

@@ -1112,3 +1112,88 @@ describe('REST API', () => {
     server.close()
   })
 })
+
+// ── Regression tests (end-to-end review) ──────────────────────────────────────
+
+describe('Regression — async defines (ESP32/Pico)', () => {
+  const SRC = `define wave
+  show happy
+  wait 500ms
+end
+
+when button_a pressed
+  do wave
+end`
+
+  it('ESP32: define with timed action is async def + awaited call', () => {
+    const r = compile(SRC, 'esp32')
+    assert.ok(r.ok)
+    assert.match(r.code!, /async def wave\(\)/)
+    assert.match(r.code!, /await wave\(\)/)
+  })
+
+  it('Pico: define is async def + awaited call', () => {
+    const r = compile(SRC, 'pico')
+    assert.ok(r.ok)
+    assert.match(r.code!, /async def wave\(\)/)
+    assert.match(r.code!, /await wave\(\)/)
+  })
+
+  it('micro:bit: define stays synchronous (no await)', () => {
+    const r = compile(SRC, 'microbit')
+    assert.ok(r.ok)
+    assert.match(r.code!, /\bdef wave\(\)/)
+    assert.doesNotMatch(r.code!, /await/)
+  })
+
+  it('CircuitPython: define stays synchronous (no await)', () => {
+    const r = compile(SRC, 'circuitpython')
+    assert.ok(r.ok)
+    assert.doesNotMatch(r.code!, /await/)
+  })
+})
+
+describe('Regression — string concat is not double-wrapped', () => {
+  it('Python: produces str(a) + str(b), never str(str(...))', () => {
+    const r = compile('when start\n  let n = 5\n  say "Count: {n}"\nend', 'esp32')
+    assert.ok(r.ok)
+    assert.doesNotMatch(r.code!, /str\(str\(/)
+    assert.match(r.code!, /"Count: " \+ str\(n\)/)
+  })
+
+  it('Arduino: produces String concat without nesting', () => {
+    const r = compile('when start\n  let n = 5\n  say "Count: {n}"\nend', 'arduino')
+    assert.ok(r.ok)
+    assert.doesNotMatch(r.code!, /String\(String\(/)
+  })
+})
+
+describe('Regression — CLI file extensions per target', () => {
+  it('all targets produce valid output that re-parses or validates', () => {
+    const SRC = 'when button_a pressed\n  say "hi"\nend'
+    const targetExt: Record<string,string> = {
+      esp32:'py', pico:'py', microbit:'py', circuitpython:'py',
+      arduino:'ino', homeassistant:'yaml', esphome:'yaml', nodered:'json',
+    }
+    for (const [target] of Object.entries(targetExt)) {
+      const r = compile(SRC, target)
+      assert.ok(r.ok, `${target} should compile`)
+      assert.ok(r.code && r.code.length > 0, `${target} should produce code`)
+    }
+  })
+
+  it('Node-RED output is valid parseable JSON', () => {
+    const r = compile('when motion detected\n  turn on lights\nend', 'nodered')
+    assert.ok(r.ok)
+    const flows = JSON.parse(r.code!)
+    assert.ok(Array.isArray(flows))
+    assert.ok(flows.length > 0)
+  })
+
+  it('Home Assistant string concat uses Jinja ~ operator', () => {
+    const r = compile('when start\n  let t = 5\n  notify "Temp {t}"\nend', 'homeassistant')
+    assert.ok(r.ok)
+    assert.match(r.code!, /~/)
+    assert.doesNotMatch(r.code!, /\{\{ \{\{/)  // no nested template braces
+  })
+})

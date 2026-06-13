@@ -49,21 +49,27 @@ export abstract class BaseCodegen {
     }
   }
 
-  // String-context emission: wraps non-strings in str()
+  // String-context emission: wraps non-strings in str() exactly once.
+  // A '+' chain becomes  str(a) + str(b) + str(c)  with no double-wrapping,
+  // because each leaf is wrapped by emitStrLeaf, not the whole sub-expression.
   protected emitStr(v: Value): string {
-    if (v.kind==='string') return JSON.stringify(v.value)
     if (v.kind==='binary' && v.op==='+')
-      return `${this.wrapStr(this.emitStr(v.left))} + ${this.wrapStr(this.emitStr(v.right))}`
+      return `${this.emitStr(v.left)} + ${this.emitStr(v.right)}`
+    return this.emitStrLeaf(v)
+  }
+  // A single (non-concatenation) value, coerced to string.
+  private emitStrLeaf(v: Value): string {
+    if (v.kind==='string') return JSON.stringify(v.value)
     return this.wrapStr(this.emitValue(v))
   }
   protected wrapStr(s: string)    { return `str(${s})` }
   protected wrapStrCpp(s: string) { return `String(${s})` }
 
-  // For say/show_text in Arduino
+  // For say/show_text in Arduino — same single-wrap rule
   protected emitStrCpp(v: Value): string {
-    if (v.kind==='string') return JSON.stringify(v.value)
     if (v.kind==='binary' && v.op==='+')
-      return `${this.wrapStrCpp(this.emitStrCpp(v.left))} + ${this.wrapStrCpp(this.emitStrCpp(v.right))}`
+      return `${this.emitStrCpp(v.left)} + ${this.emitStrCpp(v.right)}`
+    if (v.kind==='string') return JSON.stringify(v.value)
     return this.wrapStrCpp(this.emitValue(v))
   }
 
