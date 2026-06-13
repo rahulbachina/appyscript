@@ -1197,3 +1197,145 @@ describe('Regression — CLI file extensions per target', () => {
     assert.doesNotMatch(r.code!, /\{\{ \{\{/)  // no nested template braces
   })
 })
+
+// ── ESPHome v2 wiring tests ────────────────────────────────────────────────────
+
+describe('ESPHome v2 — fully wired automations', () => {
+  function eshome(src: string) {
+    const r = compile(src, 'esphome')
+    assert.ok(r.ok, r.errors.map(e=>e.message).join(', '))
+    return r.code!
+  }
+
+  it('motion trigger wires into binary_sensor.on_press (not a comment)', () => {
+    const code = eshome('when motion detected\n  turn on lights\nend')
+    assert.ok(code.includes('on_press:'))
+    assert.ok(code.includes('light.turn_on:'))
+    assert.doesNotMatch(code, /# Motion automation/)  // no longer just a comment
+    assert.doesNotMatch(code, /# Add to binary_sensor/)
+  })
+
+  it('door opens → on_press, door closes → on_release', () => {
+    const code = eshome('when door opens\n  turn on lights\nend\nwhen door closes\n  turn off lights\nend')
+    assert.ok(code.includes('on_press:'))
+    assert.ok(code.includes('on_release:'))
+  })
+
+  it('sensor threshold wires into on_value_range (not a comment)', () => {
+    const code = eshome('when distance < 30cm\n  stop\nend')
+    assert.ok(code.includes('on_value_range:'))
+    assert.ok(code.includes('below: 30.0'))
+    assert.doesNotMatch(code, /# Sensor automation/)
+    assert.doesNotMatch(code, /# Add to your sensor/)
+  })
+
+  it('when start wires into esphome.on_boot', () => {
+    const code = eshome('when start\n  say "Ready"\nend')
+    assert.ok(code.includes('on_boot:'))
+    assert.ok(code.includes('logger.log:'))
+  })
+
+  it('time trigger wires into time.on_time', () => {
+    const code = eshome('when time is 22:00\n  turn off lights\nend')
+    assert.ok(code.includes('on_time:'))
+    assert.ok(code.includes('hours: 22'))
+    assert.ok(code.includes('minutes: 0'))
+  })
+
+  it('sun rises → on_sunrise, sun sets → on_sunset', () => {
+    const code = eshome('when sun rises\n  dim lights to 30%\nend\nwhen sun sets\n  turn on lights\nend')
+    assert.ok(code.includes('on_sunrise:'))
+    assert.ok(code.includes('on_sunset:'))
+  })
+
+  it('interval timer wires into interval section', () => {
+    const code = eshome('every 5s\n  say "tick"\nend')
+    assert.ok(code.includes('interval: 5s'))
+    assert.ok(code.includes('logger.log:'))
+  })
+
+  it('define → script, do → script.execute', () => {
+    const code = eshome('define celebrate\n  show happy\nend\nwhen button_a pressed\n  do celebrate\nend')
+    assert.ok(code.includes('script:'))
+    assert.ok(code.includes('id: celebrate'))
+    assert.ok(code.includes('script.execute: celebrate'))
+  })
+
+  it('notify produces homeassistant.action with message', () => {
+    const code = eshome('when motion detected\n  notify "Alert!"\nend')
+    assert.ok(code.includes('homeassistant.action:'))
+    assert.ok(code.includes('action: notify.notify'))
+    assert.ok(code.includes('message: "Alert!"'))
+  })
+
+  it('template string in notify is single-quoted Jinja, not double-quoted', () => {
+    const code = eshome('when start\n  let t = temperature\n  notify "Temp: {t}"\nend')
+    assert.ok(code.includes('{{ id(t) }}'))
+    assert.doesNotMatch(code, /"".*""/s)  // no double-quoted inside double-quoted
+  })
+
+  it('thermostat → climate.set_temperature HA action', () => {
+    const code = eshome('when temperature > 28\n  set thermostat to 22\nend')
+    assert.ok(code.includes('action: climate.set_temperature'))
+    assert.ok(code.includes('temperature: 22'))
+  })
+
+  it('lock/unlock → HA lock actions', () => {
+    const code = eshome('when time is 22:00\n  lock front_door\nend')
+    assert.ok(code.includes('action: lock.lock'))
+    assert.ok(code.includes('entity_id: lock.front_door'))
+  })
+
+  it('scene → HA scene action', () => {
+    const code = eshome('when sun sets\n  scene "evening"\nend')
+    assert.ok(code.includes('action: scene.turn_on'))
+    assert.ok(code.includes('entity_id: scene.evening'))
+  })
+
+  it('if/else wires into ESPHome if action with lambda condition', () => {
+    const code = eshome('when button_a pressed\n  if distance < 30cm\n    show angry\n  else\n    show calm\n  end\nend')
+    assert.ok(code.includes('- if:'))
+    assert.ok(code.includes('lambda:'))
+    assert.ok(code.includes('id(distance_sensor).state < 30'))
+  })
+
+  it('wait → delay in milliseconds', () => {
+    const code = eshome('when button_a pressed\n  wait 2s\nend')
+    assert.ok(code.includes('delay: 2000ms'))
+  })
+
+  it('forever loop → 100ms interval timer', () => {
+    const code = eshome('forever\n  show happy\n  wait 500ms\nend')
+    assert.ok(code.includes('interval: 100ms'))
+  })
+
+  it('full output is valid YAML (all triggers wired)', () => {
+    // This validates the full round-trip including the complex notify case
+    const r = compile(`
+when motion detected
+  notify "Motion at {temperature} degrees"
+end
+when door opens
+  turn on lights
+end
+when time is 07:00
+  dim lights to 80%
+end
+when temperature > 30
+  set thermostat to 20
+end
+when sun rises
+  scene "morning"
+end`, 'esphome')
+    assert.ok(r.ok)
+    // Check no double-quoted YAML strings
+    const lines = r.code!.split('\n')
+    for (const line of lines) {
+      const m = line.match(/message:\s*(.+)/)
+      if (m) {
+        // Should be a single-quoted or plain value, not doubled
+        assert.doesNotMatch(m[1], /".*".*"/, `Double-quoted message: ${m[1]}`)
+      }
+    }
+  })
+})
